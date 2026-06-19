@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-rose-50/40 text-slate-800;
+    background-image:
+      radial-gradient(60rem 60rem at 110% -10%, rgb(236 72 153 / 0.07), transparent 60%),
+      radial-gradient(50rem 50rem at -10% 10%, rgb(219 39 119 / 0.05), transparent 55%);
+    background-attachment: fixed;
+  }
+}
+
+@layer components {
+  /* ── Buttons ──────────────────────────────────────────── */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 bg-gradient-to-b from-brand-500 to-brand-600
+           text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-glow
+           hover:from-brand-600 hover:to-brand-700 active:scale-[0.98]
+           transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 bg-white text-slate-700 border border-slate-200
+           px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm
+           hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] transition-all duration-150;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 bg-red-50 text-red-600 border border-red-200
+           px-4 py-2.5 rounded-xl text-sm font-semibold
+           hover:bg-red-100 active:scale-[0.98] transition-all duration-150;
+  }
+
+  /* ── Inputs ───────────────────────────────────────────── */
+  .input {
+    @apply w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800
+           placeholder:text-slate-400 shadow-sm transition-all
+           focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-400;
+  }
+
+  /* ── Surfaces ─────────────────────────────────────────── */
+  .card {
+    @apply bg-white rounded-2xl shadow-card border border-slate-200/70 p-6;
+  }
+  .card-interactive {
+    @apply transition-all duration-200 hover:shadow-card-hover hover:border-brand-200;
+  }
+
+  /* ── Badges ───────────────────────────────────────────── */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+
+  /* ── Nav links ────────────────────────────────────────── */
+  .nav-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
+           text-slate-600 transition-colors hover:bg-brand-50 hover:text-brand-700;
+  }
+  .nav-link-active {
+    @apply bg-brand-50 text-brand-700 shadow-[inset_0_0_0_1px_rgb(249_168_212)];
+  }
+}
