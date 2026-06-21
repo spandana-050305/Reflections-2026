@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { Trash2, Plus, FileText, ArrowLeft, Save } from 'lucide-react'
+import { FileText, ArrowLeft, Save } from 'lucide-react'
 import type { Event, Participant } from '@/lib/types'
 
 interface Entry {
@@ -125,8 +125,6 @@ export default function EventDetailPage() {
 
   if (!event) return <div className="card text-center text-gray-400">Event not found.</div>
 
-  const memberCount = event.is_team_event ? (event.team_size ?? 1) : 1
-
   return (
     <div className="max-w-2xl mx-auto space-y-5">
       {/* Back */}
@@ -161,6 +159,14 @@ export default function EventDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Rules */}
+      {event.rules && (
+        <div className="card">
+          <h3 className="font-semibold text-gray-800 mb-2">Rules</h3>
+          <p className="text-sm text-gray-600 whitespace-pre-wrap">{event.rules}</p>
+        </div>
+      )}
 
       {/* Frozen warning */}
       {!isOpen && (

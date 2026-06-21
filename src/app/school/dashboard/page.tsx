@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Megaphone, Calendar, ListChecks, CheckCircle } from 'lucide-react'
-import type { Announcement, Event, Participant } from '@/lib/types'
+import { Megaphone, ListChecks, CheckCircle2, CalendarDays, Sparkles, Users } from 'lucide-react'
+import Blobs from '@/components/layout/Blobs'
+import type { Announcement } from '@/lib/types'
 
 export default async function SchoolDashboard() {
   const supabase = createClient()
@@ -25,18 +26,31 @@ export default async function SchoolDashboard() {
 
   const totalEvents = events?.length ?? 0
   const filledEvents = new Set((myParticipants ?? []).map((p: { event_id: string }) => p.event_id)).size
+  const totalParticipants = (myParticipants ?? []).length
+
+  const pct = totalEvents > 0 ? Math.round((filledEvents / totalEvents) * 100) : 0
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Welcome, Slot {slotNumber}</h2>
-        <p className="text-gray-500 mt-1">Reflections Event Management</p>
+    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in-up">
+      {/* Hero band */}
+      <div className="hero-band">
+        <Blobs />
+        <div className="relative">
+          <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/80 mb-2">
+            <Sparkles size={13} /> School Portal
+          </p>
+          <h2 className="text-2xl sm:text-3xl font-bold">Welcome, Slot {slotNumber}</h2>
+          <p className="text-white/85 mt-1.5 text-sm">Reflections Event Management</p>
+        </div>
       </div>
 
       {/* Status Banner */}
-      <div className={`rounded-xl p-4 flex items-center gap-3 ${settings?.registration_open ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-        <div className={`w-3 h-3 rounded-full ${settings?.registration_open ? 'bg-green-500' : 'bg-red-500'}`} />
-        <span className={`font-medium text-sm ${settings?.registration_open ? 'text-green-800' : 'text-red-800'}`}>
+      <div className={`rounded-2xl p-4 flex items-center gap-3 border ${settings?.registration_open ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+        <span className="relative flex h-3 w-3">
+          {settings?.registration_open && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />}
+          <span className={`relative inline-flex rounded-full h-3 w-3 ${settings?.registration_open ? 'bg-green-500' : 'bg-red-500'}`} />
+        </span>
+        <span className={`font-semibold text-sm ${settings?.registration_open ? 'text-green-800' : 'text-red-800'}`}>
           {settings?.registration_open
             ? 'Registration is OPEN — fill your participants now'
             : 'Registration is CLOSED — entries are frozen'}
@@ -44,30 +58,68 @@ export default async function SchoolDashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="card text-center">
-          <p className="text-3xl font-bold text-brand-600">{filledEvents}</p>
-          <p className="text-sm text-gray-500 mt-1">Events filled</p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="stat-card">
+          <div className="absolute -top-6 -right-6 h-20 w-20 rounded-full bg-brand-100/60 blur-2xl" />
+          <div className="relative flex items-center gap-3">
+            <div className="h-11 w-11 rounded-xl bg-brand-100 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="text-brand-600" size={20} />
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-gradient leading-none">{filledEvents}</p>
+              <p className="text-sm text-gray-500 mt-1">Events filled</p>
+            </div>
+          </div>
+          {totalEvents > 0 && (
+            <div className="relative mt-4">
+              <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+                <span>Progress</span><span>{pct}%</span>
+              </div>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-2 rounded-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all" style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+          )}
         </div>
-        <div className="card text-center">
-          <p className="text-3xl font-bold text-gray-400">{totalEvents}</p>
-          <p className="text-sm text-gray-500 mt-1">Total events scheduled</p>
+        <div className="stat-card">
+          <div className="absolute -top-6 -right-6 h-20 w-20 rounded-full bg-violet-100/60 blur-2xl" />
+          <div className="relative flex items-center gap-3">
+            <div className="h-11 w-11 rounded-xl bg-violet-100 flex items-center justify-center shrink-0">
+              <Users className="text-violet-600" size={20} />
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-gray-800 leading-none">{totalParticipants}</p>
+              <p className="text-sm text-gray-500 mt-1">Participants entered</p>
+            </div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="absolute -top-6 -right-6 h-20 w-20 rounded-full bg-slate-100 blur-2xl" />
+          <div className="relative flex items-center gap-3">
+            <div className="h-11 w-11 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+              <CalendarDays className="text-slate-500" size={20} />
+            </div>
+            <div>
+              <p className="text-3xl font-bold text-gray-700 leading-none">{totalEvents}</p>
+              <p className="text-sm text-gray-500 mt-1">Total events scheduled</p>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Quick Action */}
       <Link
         href="/school/events"
-        className="card flex items-center gap-4 hover:border-brand-200 hover:shadow-md transition-all group"
+        className="card card-interactive flex items-center gap-4 group"
       >
-        <div className="w-12 h-12 bg-brand-100 rounded-xl flex items-center justify-center group-hover:bg-brand-200 transition-colors">
-          <ListChecks className="text-brand-600" size={22} />
+        <div className="w-12 h-12 bg-gradient-to-br from-brand-400 to-brand-600 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform shadow-glow">
+          <ListChecks className="text-white" size={22} />
         </div>
         <div>
           <p className="font-semibold text-gray-800">Fill Participants</p>
           <p className="text-sm text-gray-500">Add names for each event your school is entering</p>
         </div>
-        <span className="ml-auto text-brand-400 text-lg">→</span>
+        <span className="ml-auto text-brand-400 text-lg group-hover:translate-x-1 transition-transform">→</span>
       </Link>
 
       {/* Announcements */}

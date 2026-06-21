@@ -6,48 +6,88 @@
   html {
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
   }
   body {
     @apply bg-rose-50/40 text-slate-800;
     background-image:
-      radial-gradient(60rem 60rem at 110% -10%, rgb(236 72 153 / 0.07), transparent 60%),
-      radial-gradient(50rem 50rem at -10% 10%, rgb(219 39 119 / 0.05), transparent 55%);
+      radial-gradient(60rem 60rem at 110% -10%, rgb(236 72 153 / 0.08), transparent 60%),
+      radial-gradient(50rem 50rem at -10% 10%, rgb(219 39 119 / 0.06), transparent 55%),
+      radial-gradient(40rem 40rem at 50% 120%, rgb(244 114 182 / 0.05), transparent 55%);
     background-attachment: fixed;
   }
+  /* Smoother, branded scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(244 114 182 / 0.5) transparent;
+  }
+  *::-webkit-scrollbar { height: 8px; width: 8px; }
+  *::-webkit-scrollbar-thumb {
+    background: rgb(244 114 182 / 0.45);
+    border-radius: 9999px;
+  }
+  *::-webkit-scrollbar-thumb:hover { background: rgb(236 72 153 / 0.7); }
 }
 
 @layer components {
   /* ── Buttons ──────────────────────────────────────────── */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 bg-gradient-to-b from-brand-500 to-brand-600
-           text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-glow
-           hover:from-brand-600 hover:to-brand-700 active:scale-[0.98]
-           transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
+    @apply relative inline-flex items-center justify-center gap-2 bg-gradient-to-b from-brand-500 to-brand-600
+           text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-glow overflow-hidden
+           hover:from-brand-600 hover:to-brand-700 hover:shadow-glow-lg hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]
+           transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:active:scale-100;
   }
+  /* Sheen sweep on hover */
+  .btn-primary::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent;
+    transition: transform 0.7s ease;
+  }
+  .btn-primary:hover::after { @apply translate-x-full; }
+
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 bg-white text-slate-700 border border-slate-200
-           px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm
-           hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] transition-all duration-150;
+    @apply inline-flex items-center justify-center gap-2 bg-white/90 text-slate-700 border border-slate-200
+           px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm backdrop-blur-sm
+           hover:bg-white hover:border-brand-300 hover:text-brand-700 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200;
   }
   .btn-danger {
     @apply inline-flex items-center justify-center gap-2 bg-red-50 text-red-600 border border-red-200
            px-4 py-2.5 rounded-xl text-sm font-semibold
-           hover:bg-red-100 active:scale-[0.98] transition-all duration-150;
+           hover:bg-red-100 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200;
   }
 
   /* ── Inputs ───────────────────────────────────────────── */
   .input {
     @apply w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800
            placeholder:text-slate-400 shadow-sm transition-all
-           focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-400;
+           focus:outline-none focus:ring-4 focus:ring-brand-500/15 focus:border-brand-400 hover:border-slate-300;
   }
 
   /* ── Surfaces ─────────────────────────────────────────── */
+  /* NOTE: no backdrop-filter here — it creates a stacking context that
+     traps absolute dropdowns (e.g. the on-spot event picker) behind
+     sibling content. Keep the card a plain opaque surface. */
   .card {
-    @apply bg-white rounded-2xl shadow-card border border-slate-200/70 p-6;
+    @apply relative bg-white rounded-2xl shadow-card border border-slate-200/70 p-6
+           transition-shadow duration-300;
   }
   .card-interactive {
-    @apply transition-all duration-200 hover:shadow-card-hover hover:border-brand-200;
+    @apply transition-all duration-300 hover:shadow-card-hover hover:border-brand-200 hover:-translate-y-1;
+  }
+  /* Glass card — for hero / featured surfaces */
+  .card-glass {
+    @apply relative rounded-2xl border border-white/60 bg-white/70 backdrop-blur-md shadow-card;
+  }
+  /* Gradient hero header band */
+  .hero-band {
+    @apply relative overflow-hidden rounded-3xl p-6 sm:p-8 text-white
+           bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700 shadow-glow;
+  }
+
+  /* ── Stat card ────────────────────────────────────────── */
+  .stat-card {
+    @apply relative overflow-hidden bg-white/95 backdrop-blur-sm rounded-2xl border border-slate-200/70 shadow-card p-5
+           transition-all duration-300 hover:shadow-card-hover hover:-translate-y-1 hover:border-brand-200;
   }
 
   /* ── Badges ───────────────────────────────────────────── */
@@ -57,10 +97,42 @@
 
   /* ── Nav links ────────────────────────────────────────── */
   .nav-link {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
-           text-slate-600 transition-colors hover:bg-brand-50 hover:text-brand-700;
+    @apply relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
+           text-slate-600 transition-all duration-200 hover:bg-brand-50 hover:text-brand-700 hover:translate-x-0.5;
   }
   .nav-link-active {
-    @apply bg-brand-50 text-brand-700 shadow-[inset_0_0_0_1px_rgb(249_168_212)];
+    @apply bg-gradient-to-r from-brand-50 to-brand-100/60 text-brand-700 font-semibold
+           shadow-[inset_0_0_0_1px_rgb(249_168_212)];
   }
+}
+
+@layer utilities {
+  /* Gradient brand text */
+  .text-gradient {
+    @apply bg-gradient-to-r from-brand-500 via-brand-600 to-brand-700 bg-clip-text text-transparent;
+  }
+  /* Decorative soft blob — place inside a relative/overflow-hidden parent */
+  .blob {
+    @apply pointer-events-none absolute rounded-full blur-3xl;
+  }
+  /* Subtle dotted texture overlay */
+  .dot-grid {
+    background-image: radial-gradient(rgb(244 114 182 / 0.18) 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+  /* Shimmer skeleton */
+  .skeleton {
+    @apply relative overflow-hidden bg-slate-100 rounded-lg;
+  }
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer;
+  }
+  /* Stagger helper for list reveals */
+  .stagger > * { animation: fade-in-up 0.4s ease-out both; }
+  .stagger > *:nth-child(2) { animation-delay: 0.05s; }
+  .stagger > *:nth-child(3) { animation-delay: 0.1s; }
+  .stagger > *:nth-child(4) { animation-delay: 0.15s; }
+  .stagger > *:nth-child(5) { animation-delay: 0.2s; }
+  .stagger > *:nth-child(6) { animation-delay: 0.25s; }
 }

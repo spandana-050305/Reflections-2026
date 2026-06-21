@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { Plus, Pencil, Trash2, FileText, X, Save } from 'lucide-react'
-import type { Category, Event } from '@/lib/types'
+import { Plus, X, Save } from 'lucide-react'
+import type { Category } from '@/lib/types'
 import { parseAssignedMembers } from '@/lib/types'
+
+const DEFAULT_CRITERIA = ['', '', '', '']
 
 const EMPTY_FORM = {
   name: '',
@@ -18,7 +20,8 @@ const EMPTY_FORM = {
   member1: '',
   member2: '',
   member3: '',
-  criteria_count: 4,
+  criteria: DEFAULT_CRITERIA as string[],
+  rules: '',
 }
 
 export default function AdminEventsPage() {
@@ -28,7 +31,6 @@ export default function AdminEventsPage() {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
-  const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
 
@@ -46,6 +48,10 @@ export default function AdminEventsPage() {
   function startEdit(ev: any) {
     setEditId(ev.id)
     const members: string[] = parseAssignedMembers(ev.assigned_members)
+    const criteria: string[] =
+      ev.criteria_names && ev.criteria_names.length > 0
+        ? ev.criteria_names
+        : Array.from({ length: ev.criteria_count ?? 4 }, (_, i) => `Criteria ${i + 1}`)
     setForm({
       name: ev.name,
       category_id: ev.category_id,
@@ -58,7 +64,8 @@ export default function AdminEventsPage() {
       member1: members[0] ?? '',
       member2: members[1] ?? '',
       member3: members[2] ?? '',
-      criteria_count: ev.criteria_count ?? 4,
+      criteria,
+      rules: ev.rules ?? '',
     })
     setShowForm(true)
   }
@@ -67,7 +74,6 @@ export default function AdminEventsPage() {
     setShowForm(false)
     setEditId(null)
     setForm({ ...EMPTY_FORM, category_id: categories[0]?.id ?? '' })
-    setUploadFile(null)
     setMessage('')
   }
 
@@ -75,23 +81,6 @@ export default function AdminEventsPage() {
     if (!form.name || !form.category_id) { setMessage('Name and category are required.'); return }
     setSaving(true)
     setMessage('')
-
-    let rulebook_url: string | undefined
-
-    // Upload rulebook if provided
-    if (uploadFile) {
-      const path = `${Date.now()}-${uploadFile.name.replace(/\s/g, '_')}`
-      const { data: upload, error: uploadErr } = await supabase.storage
-        .from('rulebooks')
-        .upload(path, uploadFile, { upsert: true })
-      if (uploadErr) {
-        setMessage('Failed to upload rulebook: ' + uploadErr.message)
-        setSaving(false)
-        return
-      }
-      const { data: { publicUrl } } = supabase.storage.from('rulebooks').getPublicUrl(path)
-      rulebook_url = publicUrl
-    }
 
     const assignedMembers = [form.member1, form.member2, form.member3]
       .map(m => m.trim()).filter(Boolean)
@@ -106,9 +95,10 @@ export default function AdminEventsPage() {
       event_time: form.event_time || null,
       venue: form.venue || null,
       assigned_members: assignedMembers.length > 0 ? assignedMembers : null,
-      criteria_count: form.criteria_count || 4,
+      criteria_names: form.criteria,
+      criteria_count: form.criteria.length || 4,
+      rules: form.rules || null,
     }
-    if (rulebook_url) payload.rulebook_url = rulebook_url
 
     if (editId) {
       await supabase.from('events').update(payload).eq('id', editId)
@@ -170,11 +160,7 @@ export default function AdminEventsPage() {
               <label className="block text-xs font-medium text-gray-600 mb-1">Max Entries per School</label>
               <input type="number" min={1} className="input" value={form.max_entries} onChange={e => setForm({ ...form, max_entries: +e.target.value })} />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Number of Judging Criteria</label>
-              <input type="number" min={1} max={10} className="input" value={form.criteria_count} onChange={e => setForm({ ...form, criteria_count: +e.target.value })} />
-            </div>
-            <div className="flex items-center gap-4 pt-4">
+            <div className="flex items-center gap-4 pt-6">
               <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                 <input type="checkbox" checked={form.is_team_event} onChange={e => setForm({ ...form, is_team_event: e.target.checked })} className="rounded" />
                 Team Event
@@ -185,6 +171,55 @@ export default function AdminEventsPage() {
                   <input type="number" min={1} className="input w-20" value={form.team_size} onChange={e => setForm({ ...form, team_size: +e.target.value })} />
                 </div>
               )}
+            </div>
+            <div className="sm:col-span-2">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-gray-600">Rules</label>
+              </div>
+              <textarea
+                className="input"
+                rows={3}
+                value={form.rules}
+                onChange={e => setForm({ ...form, rules: e.target.value })}
+                placeholder="Enter event rules visible to schools and judges..."
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-gray-600">Judging Criteria</label>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, criteria: [...form.criteria, ''] })}
+                  className="text-xs text-brand-600 hover:underline flex items-center gap-1"
+                >
+                  <Plus size={12} /> Add Criteria
+                </button>
+              </div>
+              <div className="space-y-2">
+                {form.criteria.map((c, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <input
+                      className="input flex-1"
+                      placeholder={`Criteria ${i + 1} name`}
+                      value={c}
+                      onChange={e => {
+                        const next = [...form.criteria]
+                        next[i] = e.target.value
+                        setForm({ ...form, criteria: next })
+                      }}
+                    />
+                    {form.criteria.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, criteria: form.criteria.filter((_, j) => j !== i) })}
+                        className="text-red-400 hover:text-red-600 shrink-0"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
@@ -197,10 +232,6 @@ export default function AdminEventsPage() {
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Venue</label>
               <input className="input" value={form.venue} onChange={e => setForm({ ...form, venue: e.target.value })} placeholder="e.g. Main Hall" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Rulebook PDF</label>
-              <input type="file" accept=".pdf" onChange={e => setUploadFile(e.target.files?.[0] ?? null)} className="text-sm text-gray-600" />
             </div>
             <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-gray-600 mb-2">Assigned Members <span className="text-gray-400 font-normal">(up to 3)</span></label>
@@ -243,7 +274,7 @@ export default function AdminEventsPage() {
                     {ev.venue && <span>📍 {ev.venue}</span>}
                     {ev.event_date && <span>📅 {ev.event_date}</span>}
                     {ev.max_entries > 1 && <span>Max {ev.max_entries} entries</span>}
-                    <span>{ev.criteria_count ?? 4} criteria</span>
+                    <span>{ev.criteria_names?.length ?? ev.criteria_count ?? 4} criteria</span>
                   </div>
                 </div>
                 <div className="flex gap-2 shrink-0">

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { Trophy, Eye, EyeOff, Lock, CheckCircle2, Clock } from 'lucide-react'
+import { Trophy, Lock, CheckCircle2, Clock } from 'lucide-react'
 import type { Category, Event } from '@/lib/types'
 
 interface WinnerEntry { slot: number; entry: number; names: string }
@@ -28,7 +28,6 @@ export default function AdminResultsPage() {
   const [schools, setSchools] = useState<any[]>([])
   const [results, setResults] = useState<any[]>([])
   const [selectedCat, setSelectedCat] = useState('')
-  const [saving, setSaving] = useState<string | null>(null)
   const [message, setMessage] = useState('')
 
   async function load() {
@@ -53,11 +52,9 @@ export default function AdminResultsPage() {
   }
 
   async function togglePublish(eventId: string, currentlyPublished: boolean) {
-    setSaving(eventId)
     await supabase.from('results').update({ published: !currentlyPublished }).eq('event_id', eventId)
     setMessage(currentlyPublished ? 'Result unpublished.' : 'Result published to schools!')
     await load()
-    setSaving(null)
     setTimeout(() => setMessage(''), 3000)
   }
 

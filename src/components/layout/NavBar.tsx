@@ -29,18 +29,25 @@ export default function NavBar({ title, role, slotNumber }: NavBarProps) {
   }
 
   return (
-    <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-slate-200">
+    <header className="sticky top-0 z-30 bg-white/70 backdrop-blur-xl border-b border-white/60 shadow-[0_1px_0_0_rgb(244_114_182_/_0.15)]">
+      {/* Thin brand accent line */}
+      <div className="h-0.5 w-full bg-gradient-to-r from-brand-400 via-rose-400 to-brand-500" />
       <div className="px-4 sm:px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Image src="/logo.png" alt="Rotaract Club MCE" width={36} height={36} className="object-contain" />
+          <div className="relative shrink-0">
+            <div className="absolute inset-0 rounded-xl bg-brand-300/40 blur-md" />
+            <div className="relative flex items-center justify-center h-10 w-10 rounded-xl bg-white shadow-sm ring-1 ring-brand-100">
+              <Image src="/logo.png" alt="Rotaract Club MCE" width={32} height={32} className="object-contain" />
+            </div>
+          </div>
           <div className="leading-tight">
-            <h1 className="font-bold text-slate-900">Reflections</h1>
-            <p className="text-slate-500 text-xs">{roleLabel[role] ?? role}</p>
+            <h1 className="font-bold text-gradient text-lg">Reflections</h1>
+            <p className="text-slate-500 text-xs font-medium">{roleLabel[role] ?? role}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="text-slate-500 text-sm font-medium hidden sm:block">{title}</span>
+          <span className="text-slate-500 text-sm font-medium hidden sm:block px-3 py-1 rounded-full bg-slate-50 border border-slate-100">{title}</span>
           <button
             onClick={handleLogout}
             className="flex items-center gap-2 text-slate-600 hover:text-red-600 hover:bg-red-50 px-3 py-2 rounded-xl text-sm font-medium transition-colors"

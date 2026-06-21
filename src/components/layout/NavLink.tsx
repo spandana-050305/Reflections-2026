@@ -18,11 +18,13 @@ export default function NavLink({ href, label, variant = 'sidebar', children }: 
     return (
       <Link
         href={href}
-        className={`flex-shrink-0 flex flex-col items-center py-2 px-3 text-xs gap-1 transition-colors ${
-          active ? 'text-brand-600 font-semibold' : 'text-slate-500 hover:text-brand-600'
+        className={`flex-shrink-0 flex flex-col items-center py-1.5 px-3 text-[11px] gap-1 rounded-2xl transition-all duration-200 ${
+          active
+            ? 'text-brand-700 font-semibold bg-gradient-to-b from-brand-50 to-brand-100/70 shadow-[inset_0_0_0_1px_rgb(251_207_232)] -translate-y-0.5'
+            : 'text-slate-500 hover:text-brand-600 active:scale-95'
         }`}
       >
-        {children}
+        <span className={active ? 'scale-110 transition-transform' : 'transition-transform'}>{children}</span>
         <span className="whitespace-nowrap">{label}</span>
       </Link>
     )
