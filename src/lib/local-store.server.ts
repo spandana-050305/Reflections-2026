@@ -56,6 +56,10 @@ function readStore(): LocalStore {
       store.guest_marks = []
       dirty = true
     }
+    if (!Array.isArray(store.club_accounts)) {
+      store.club_accounts = []
+      dirty = true
+    }
     if (store.settings && store.settings.points_1st == null) {
       store.settings.points_1st = 15
       store.settings.points_2nd = 10

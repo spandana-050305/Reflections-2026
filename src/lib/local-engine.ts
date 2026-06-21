@@ -27,6 +27,7 @@ export interface LocalStore {
   onspot_registrations: any[]
   guest_credentials: any[]
   guest_marks: any[]
+  club_accounts: any[]
   settings: { id: number; registration_open: boolean; points_1st?: number; points_2nd?: number; points_3rd?: number }
   users: StoreUser[]
 }
@@ -72,6 +73,7 @@ export function buildSeedStore(): LocalStore {
     announcements: MOCK_ANNOUNCEMENTS,
     onspot_registrations: MOCK_ONSPOT,
     guest_credentials: [],
+    club_accounts: [],
     guest_marks: [],
     settings: MOCK_SETTINGS,
     users,
@@ -99,6 +101,8 @@ function getTable(store: LocalStore, name: string): any[] {
     case 'onspot_registrations': return store.onspot_registrations ?? []
     case 'guest_credentials':    return store.guest_credentials ?? (store.guest_credentials = [])
     case 'guest_marks':          return store.guest_marks ?? (store.guest_marks = [])
+    case 'club_accounts':        return store.club_accounts ?? (store.club_accounts = [])
+    case 'users':                return store.users
     case 'settings':             return [store.settings]
     default:                     return []
   }

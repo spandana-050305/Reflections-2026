@@ -104,7 +104,34 @@ export interface Settings {
   points_1st?: number
   points_2nd?: number
   points_3rd?: number
+  // Password required to Unlock / Full Unlock marks in Guest Marks.
+  unlock_password?: string | null
+  // Security-question answers used to reset the unlock password.
+  security_answer_1?: string | null
+  security_answer_2?: string | null
 }
+
+// A club member's self-registration, reviewed by the Super Admin (Final Year).
+// The auth user is created at registration; `status` gates portal access.
+export type ClubAccountStatus = 'pending' | 'approved' | 'rejected'
+// Self-registration is limited to these two access levels.
+export type RegisterRole = 'final_year' | 'club_member'
+export interface ClubAccount {
+  id: string
+  name: string
+  login_id: string
+  email: string
+  role: RegisterRole
+  status: ClubAccountStatus
+  created_at: string
+  reviewed_at?: string | null
+}
+
+// Fixed security questions asked when setting/resetting the unlock password.
+export const SECURITY_QUESTIONS = [
+  'What is your favourite food?',
+  'If you could have any superpower, what would it be?',
+]
 
 // Admin-managed login credentials for guest marks evaluators.
 export interface GuestCredential {

@@ -246,6 +246,12 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS points_1st INTEGER NOT NULL DEFAUL
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS points_2nd INTEGER NOT NULL DEFAULT 10;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS points_3rd INTEGER NOT NULL DEFAULT 5;
 
+-- ── SETTINGS: unlock password + security answers ─────────────
+-- Gates Unlock / Full Unlock in Guest Marks; answers reset the password.
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS unlock_password   TEXT;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS security_answer_1 TEXT;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS security_answer_2 TEXT;
+
 -- ── GUEST CREDENTIALS ────────────────────────────────────────
 -- Admin-managed logins handed to guest evaluators (judges).
 CREATE TABLE IF NOT EXISTS guest_credentials (
@@ -273,6 +279,35 @@ CREATE TABLE IF NOT EXISTS guest_marks (
   updated_at      TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (event_id, judge_number, slot_number, entry_index)
 );
+
+-- ── CLUB ACCOUNTS (self-registration + approval) ─────────────
+-- Club members register themselves from the sign-in page; the Super Admin
+-- (final_year) approves or rejects. The auth user is created at registration;
+-- `status` gates access to the club portal until approved.
+CREATE TABLE IF NOT EXISTS club_accounts (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name        TEXT NOT NULL,
+  login_id    TEXT NOT NULL UNIQUE,
+  email       TEXT NOT NULL UNIQUE,
+  role        TEXT NOT NULL DEFAULT 'club_member',  -- club_member | final_year
+  status      TEXT NOT NULL DEFAULT 'pending',      -- pending | approved | rejected
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  reviewed_at TIMESTAMPTZ
+);
+
+ALTER TABLE club_accounts ENABLE ROW LEVEL SECURITY;
+-- Anyone can create a registration request (sign-up).
+CREATE POLICY "anyone_register_club" ON club_accounts
+  FOR INSERT WITH CHECK (true);
+-- A club member can read their own row (to see approval status);
+-- the final year admin can read/manage all.
+CREATE POLICY "read_own_or_admin_club" ON club_accounts
+  FOR SELECT USING (
+    get_user_role() = 'final_year'
+    OR email = (auth.jwt() ->> 'email')
+  );
+CREATE POLICY "admin_manage_club" ON club_accounts
+  FOR ALL USING (get_user_role() = 'final_year');
 
 -- ── ON-SPOT REGISTRATIONS ────────────────────────────────────
 -- Walk-in entries added by club members on the event day.

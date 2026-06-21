@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import {
   ChevronDown, ChevronRight, Trophy, Users, AlertCircle, ClipboardCheck,
-  Pencil, Lock, Unlock, Settings2,
+  Pencil, Lock, Unlock, Settings2, ShieldCheck,
 } from 'lucide-react'
 import type { Category, Event } from '@/lib/types'
 
@@ -29,6 +29,12 @@ export default function AdminGuestMarksPage() {
   const [computeTarget, setComputeTarget] = useState<string | null>(null)
   const [lockAllTarget, setLockAllTarget] = useState<string | null>(null)
   const [fullUnlockTarget, setFullUnlockTarget] = useState<string | null>(null)
+
+  // Unlock password gate
+  const [unlockPassword, setUnlockPassword] = useState('')
+  const [pwPrompt, setPwPrompt] = useState<{ kind: 'entry' | 'full'; eventId: string; slot?: number; entry?: number } | null>(null)
+  const [pwInput, setPwInput] = useState('')
+  const [pwError, setPwError] = useState('')
 
   // Points settings (place points)
   const [draftPts, setDraftPts] = useState({ p1: 15, p2: 10, p3: 5 })
@@ -67,6 +73,7 @@ export default function AdminGuestMarksPage() {
     setResults(res)
     if (stg) {
       setDraftPts({ p1: stg.points_1st ?? 15, p2: stg.points_2nd ?? 10, p3: stg.points_3rd ?? 5 })
+      setUnlockPassword(stg.unlock_password ?? '')
     }
   }
 
@@ -192,6 +199,26 @@ export default function AdminGuestMarksPage() {
     flash('Fully unlocked ✓')
     setSaving(false)
     setFullUnlockTarget(null)
+  }
+
+  // ── Password-gated unlock actions ───────────────────────────────────────────
+  function requestUnlockEntry(eventId: string, slot: number, entry: number) {
+    if (!unlockPassword) { unlockEntry(eventId, slot, entry); return }
+    setPwInput(''); setPwError(''); setPwPrompt({ kind: 'entry', eventId, slot, entry })
+  }
+
+  function requestFullUnlock(eventId: string) {
+    if (!unlockPassword) { setFullUnlockTarget(eventId); return }
+    setPwInput(''); setPwError(''); setPwPrompt({ kind: 'full', eventId })
+  }
+
+  function confirmPassword() {
+    if (!pwPrompt) return
+    if (pwInput.trim() !== unlockPassword) { setPwError('Incorrect password.'); return }
+    const p = pwPrompt
+    setPwPrompt(null)
+    if (p.kind === 'entry' && p.slot != null && p.entry != null) unlockEntry(p.eventId, p.slot, p.entry)
+    else if (p.kind === 'full') fullUnlock(p.eventId)
   }
 
   async function saveEditedMark() {
@@ -370,7 +397,7 @@ export default function AdminGuestMarksPage() {
                               <td className="px-3 py-2 border border-gray-100 text-center font-semibold text-gray-900">{avg ?? '—'}</td>
                               <td className="px-3 py-2 border border-gray-100 text-center">
                                 {locked
-                                  ? <button onClick={() => unlockEntry(ev.id, slot, entry)} disabled={saving} className="text-xs text-amber-600 hover:underline flex items-center gap-1 mx-auto"><Unlock size={11} />Unlock</button>
+                                  ? <button onClick={() => requestUnlockEntry(ev.id, slot, entry)} disabled={saving} className="text-xs text-amber-600 hover:underline flex items-center gap-1 mx-auto"><Unlock size={11} />Unlock</button>
                                   : <button onClick={() => lockEntry(ev.id, slot, entry)} disabled={saving} className="text-xs text-gray-500 hover:text-brand-600 hover:underline flex items-center gap-1 mx-auto"><Lock size={11} />Lock</button>
                                 }
                               </td>
@@ -395,7 +422,7 @@ export default function AdminGuestMarksPage() {
                       </button>
                     )}
                     {result && (
-                      <button onClick={() => setFullUnlockTarget(ev.id)} disabled={saving} className="btn-danger flex items-center gap-2">
+                      <button onClick={() => requestFullUnlock(ev.id)} disabled={saving} className="btn-danger flex items-center gap-2">
                         <Unlock size={14} /> Full Unlock
                       </button>
                     )}
@@ -472,6 +499,39 @@ export default function AdminGuestMarksPage() {
             <div className="flex gap-3 pt-1">
               <button onClick={() => fullUnlock(fullUnlockTarget)} className="btn-danger flex-1">Unlock Everything</button>
               <button onClick={() => setFullUnlockTarget(null)} className="btn-secondary flex-1">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password prompt for unlock / full unlock */}
+      {pwPrompt && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl space-y-4 animate-scale-in">
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="text-brand-600 shrink-0" size={22} />
+              <p className="font-semibold text-gray-900">
+                {pwPrompt.kind === 'full' ? 'Full unlock — enter password' : 'Unlock — enter password'}
+              </p>
+            </div>
+            <p className="text-sm text-gray-500">
+              {pwPrompt.kind === 'full'
+                ? 'This unlocks every slot and deletes the computed winners for this event.'
+                : `Unlock Slot ${pwPrompt.slot}'s marks so they can be edited again.`}
+            </p>
+            <input
+              type="password"
+              autoFocus
+              value={pwInput}
+              onChange={e => { setPwInput(e.target.value); setPwError('') }}
+              onKeyDown={e => { if (e.key === 'Enter') confirmPassword() }}
+              className="input"
+              placeholder="Unlock password"
+            />
+            {pwError && <p className="text-sm text-red-600">{pwError}</p>}
+            <div className="flex gap-3 pt-1">
+              <button onClick={confirmPassword} className={`flex-1 ${pwPrompt.kind === 'full' ? 'btn-danger' : 'btn-primary'}`}>Confirm</button>
+              <button onClick={() => setPwPrompt(null)} className="btn-secondary flex-1">Cancel</button>
             </div>
           </div>
         </div>

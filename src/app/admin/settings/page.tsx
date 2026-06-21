@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { Settings, Lock, Unlock, Plus, Trash2, Copy, Eye, EyeOff, FileDown, KeyRound, X, Save, Layers } from 'lucide-react'
+import { Settings, Lock, Unlock, Plus, Trash2, Copy, Eye, EyeOff, FileDown, KeyRound, X, Save, Layers, ShieldCheck } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import { SECURITY_QUESTIONS } from '@/lib/types'
 
 function generatePassword(length = 10): string {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
@@ -37,13 +38,61 @@ export default function AdminSettingsPage() {
   const [bulkPrefix, setBulkPrefix] = useState('judge')
   const [bulkCount, setBulkCount] = useState(10)
 
+  // ── Unlock password (protects Unlock / Full Unlock in Guest Marks) ──
+  const [hasUnlockPassword, setHasUnlockPassword] = useState(false)
+  const [storedAnswers, setStoredAnswers] = useState<{ a1: string; a2: string }>({ a1: '', a2: '' })
+  const [pwForm, setPwForm] = useState({ password: '', a1: '', a2: '' })
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwMsg, setPwMsg] = useState('')
+  const [pwMsgType, setPwMsgType] = useState<'success' | 'error'>('success')
+  const [showReset, setShowReset] = useState(false)
+  const [resetForm, setResetForm] = useState({ a1: '', a2: '', password: '' })
+
+  function showPwMsg(text: string, type: 'success' | 'error' = 'success') {
+    setPwMsg(text); setPwMsgType(type); setTimeout(() => setPwMsg(''), 5000)
+  }
+
   useEffect(() => {
-    supabase.from('settings').select('registration_open').single().then(({ data }: { data: { registration_open: boolean } | null }) => {
-      if (data) setRegistrationOpen(data.registration_open)
+    supabase.from('settings').select('*').single().then(({ data }: { data: any }) => {
+      if (data) {
+        setRegistrationOpen(data.registration_open)
+        setHasUnlockPassword(!!data.unlock_password)
+        setStoredAnswers({ a1: data.security_answer_1 ?? '', a2: data.security_answer_2 ?? '' })
+      }
       setLoading(false)
     })
     loadGuestCreds()
   }, [])
+
+  async function saveUnlockPassword() {
+    if (!pwForm.password.trim()) { showPwMsg('Enter a password.', 'error'); return }
+    if (!pwForm.a1.trim() || !pwForm.a2.trim()) { showPwMsg('Answer both security questions.', 'error'); return }
+    setPwSaving(true)
+    await supabase.from('settings').update({
+      unlock_password: pwForm.password.trim(),
+      security_answer_1: pwForm.a1.trim(),
+      security_answer_2: pwForm.a2.trim(),
+    }).eq('id', 1)
+    setHasUnlockPassword(true)
+    setStoredAnswers({ a1: pwForm.a1.trim(), a2: pwForm.a2.trim() })
+    setPwForm({ password: '', a1: '', a2: '' })
+    showPwMsg('Unlock password set.')
+    setPwSaving(false)
+  }
+
+  async function resetUnlockPassword() {
+    const norm = (s: string) => s.trim().toLowerCase()
+    if (norm(resetForm.a1) !== norm(storedAnswers.a1) || norm(resetForm.a2) !== norm(storedAnswers.a2)) {
+      showPwMsg('Security answers do not match.', 'error'); return
+    }
+    if (!resetForm.password.trim()) { showPwMsg('Enter a new password.', 'error'); return }
+    setPwSaving(true)
+    await supabase.from('settings').update({ unlock_password: resetForm.password.trim() }).eq('id', 1)
+    setResetForm({ a1: '', a2: '', password: '' })
+    setShowReset(false)
+    showPwMsg('Unlock password reset.')
+    setPwSaving(false)
+  }
 
   async function loadGuestCreds() {
     const { data } = await supabase.from('guest_credentials').select('*').order('login_id')
@@ -341,6 +390,80 @@ export default function AdminSettingsPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Unlock Password */}
+      <div className="card space-y-4">
+        <div>
+          <h3 className="font-semibold text-gray-800 mb-1 flex items-center gap-2">
+            <ShieldCheck size={16} className="text-brand-600" /> Marks Unlock Password
+          </h3>
+          <p className="text-sm text-gray-500">
+            Required to <strong>Unlock</strong> a slot or <strong>Full Unlock</strong> an event in Guest Marks, so locked marks can't be changed without it.
+          </p>
+        </div>
+
+        {pwMsg && (
+          <div className={`px-4 py-2.5 rounded-xl text-sm font-medium border ${pwMsgType === 'error' ? 'bg-red-50 border-red-100 text-red-700' : 'bg-green-50 border-green-100 text-green-700'}`}>
+            {pwMsg}
+          </div>
+        )}
+
+        {!hasUnlockPassword ? (
+          <div className="rounded-xl border border-brand-100 bg-brand-50/30 p-4 space-y-3">
+            <p className="text-sm font-medium text-gray-700">Set a password</p>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Password</label>
+              <input type="text" className="input" value={pwForm.password}
+                onChange={e => setPwForm(f => ({ ...f, password: e.target.value }))} placeholder="Choose an unlock password" />
+            </div>
+            <p className="text-xs text-gray-500 pt-1">Security questions (used to reset the password if forgotten):</p>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">{SECURITY_QUESTIONS[0]}</label>
+              <input className="input" value={pwForm.a1} onChange={e => setPwForm(f => ({ ...f, a1: e.target.value }))} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">{SECURITY_QUESTIONS[1]}</label>
+              <input className="input" value={pwForm.a2} onChange={e => setPwForm(f => ({ ...f, a2: e.target.value }))} />
+            </div>
+            <button onClick={saveUnlockPassword} disabled={pwSaving} className="btn-primary flex items-center gap-2 text-sm">
+              <Save size={14} /> {pwSaving ? 'Saving…' : 'Set Password'}
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 flex items-center gap-2 text-sm text-green-800">
+              <Lock size={15} /> An unlock password is set.
+            </div>
+            {!showReset ? (
+              <button onClick={() => setShowReset(true)} className="btn-secondary flex items-center gap-2 text-sm">
+                <KeyRound size={14} /> Reset Password
+              </button>
+            ) : (
+              <div className="rounded-xl border border-brand-100 bg-brand-50/30 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-gray-700">Answer your security questions</p>
+                  <button onClick={() => { setShowReset(false); setResetForm({ a1: '', a2: '', password: '' }) }} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{SECURITY_QUESTIONS[0]}</label>
+                  <input className="input" value={resetForm.a1} onChange={e => setResetForm(f => ({ ...f, a1: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{SECURITY_QUESTIONS[1]}</label>
+                  <input className="input" value={resetForm.a2} onChange={e => setResetForm(f => ({ ...f, a2: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">New password</label>
+                  <input type="text" className="input" value={resetForm.password} onChange={e => setResetForm(f => ({ ...f, password: e.target.value }))} placeholder="New unlock password" />
+                </div>
+                <button onClick={resetUnlockPassword} disabled={pwSaving} className="btn-primary flex items-center gap-2 text-sm">
+                  <Save size={14} /> {pwSaving ? 'Saving…' : 'Reset Password'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Info card */}
