@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { Mail, Lock, ArrowRight, FlaskConical, Eye, EyeOff } from 'lucide-react'
+import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react'
 import Image from 'next/image'
 
 export default function LoginPage() {
@@ -46,26 +46,33 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden bg-white">
-      {/* Subtle pink gradient blobs */}
+      {/* Animated pink gradient blobs */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-pink-200/40 blur-3xl" />
-        <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-pink-100/60 blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-rose-100/30 blur-3xl" />
+        <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-pink-200/40 blur-3xl animate-float-slow" />
+        <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-pink-100/60 blur-3xl animate-float" />
+        <div className="absolute top-1/2 left-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-rose-100/30 blur-3xl animate-pulse-glow" />
       </div>
+      {/* Subtle dot texture */}
+      <div className="pointer-events-none absolute inset-0 dot-grid opacity-40" />
 
       <div className="relative w-full max-w-md animate-fade-in-up">
         {/* Logo + title */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            <Image
-              src="/logo.png"
-              alt="Rotaract Club MCE"
-              width={80}
-              height={80}
-              className="object-contain drop-shadow-sm"
-            />
+            <div className="relative">
+              <div className="absolute inset-0 rounded-3xl bg-brand-300/40 blur-xl animate-pulse-glow" />
+              <div className="relative flex items-center justify-center h-20 w-20 rounded-3xl bg-white shadow-glow ring-1 ring-brand-100">
+                <Image
+                  src="/logo.png"
+                  alt="Rotaract Club MCE"
+                  width={56}
+                  height={56}
+                  className="object-contain"
+                />
+              </div>
+            </div>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Reflections</h1>
+          <h1 className="text-4xl font-bold tracking-tight text-gradient">Reflections</h1>
           <p className="text-slate-500 mt-1.5 text-sm">Rotaract Club MCE · Event Platform</p>
         </div>
 

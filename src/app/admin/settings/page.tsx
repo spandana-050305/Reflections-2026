@@ -75,7 +75,7 @@ export default function AdminSettingsPage() {
     const email = loginIdToEmail(slug)
     const password = generatePassword()
 
-    const { data: authData, error: authErr } = await supabase.auth.signUp({
+    const { error: authErr } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { role: 'guest' } },

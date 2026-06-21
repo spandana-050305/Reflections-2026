@@ -51,9 +51,9 @@ export interface Event {
   event_time: string | null
   venue: string | null
   assigned_members: string[] | null
-  // Number of judging criteria configured for this event — determines how
-  // many score-entry columns guest judges see when evaluating it.
   criteria_count: number
+  criteria_names: string[] | null
+  rules: string | null
   created_at: string
   categories?: Category
 }

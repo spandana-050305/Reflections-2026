@@ -4,12 +4,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import {
   ArrowLeft, FileText, MapPin, Users, ClipboardList, Lock,
-  CheckCircle2, FlaskConical, Send,
+  CheckCircle2, FlaskConical, Plus, X, Search,
 } from 'lucide-react'
 import type { Category, Event } from '@/lib/types'
 import { MAX_JUDGES, NUM_TRIALS, parseAssignedMembers } from '@/lib/types'
+import MarkSelect from '@/components/MarkSelect'
 
-type Step = 'category' | 'event' | 'judge' | 'locked' | 'trial' | 'real' | 'done'
+type Step = 'category' | 'event' | 'judge' | 'locked' | 'trial' | 'ready' | 'real' | 'done'
 
 interface EntryRow {
   slot_number: number
@@ -32,13 +33,19 @@ export default function GuestEvaluatePage() {
 
   const [judgeName, setJudgeName] = useState('')
   const [judgeNumber, setJudgeNumber] = useState<number | ''>('')
+  // Who is assigned to (coordinating) this event — at least 2 fields shown.
+  const [assignees, setAssignees] = useState<string[]>(['', ''])
 
   const [rows, setRows] = useState<EntryRow[]>([])
   const [trialNum, setTrialNum] = useState(1)
+  const [trialSubmitted, setTrialSubmitted] = useState(false)
   const [scores, setScores] = useState<Record<string, number[]>>({})
-  const [showConfirm, setShowConfirm] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+
+  const [submittedRows, setSubmittedRows] = useState<Set<string>>(new Set())
+  const [savingRow, setSavingRow] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState('')
+  const [search, setSearch] = useState('')
+  const [showFinishConfirm, setShowFinishConfirm] = useState(false)
 
   useEffect(() => { loadCategoriesAndEvents() }, [])
 
@@ -64,6 +71,12 @@ export default function GuestEvaluatePage() {
 
   function emptyScores(): number[] {
     return Array.from({ length: event?.criteria_count ?? 4 }, () => 0)
+  }
+
+  function criteriaLabel(i: number): string {
+    const names = event?.criteria_names
+    if (names && names[i] && names[i].trim()) return names[i].trim()
+    return `Criteria ${i + 1}`
   }
 
   async function loadParticipantsForEvent(ev: Event) {
@@ -102,6 +115,8 @@ export default function GuestEvaluatePage() {
 
   async function selectEvent(ev: Event) {
     setEvent(ev)
+    const existing = parseAssignedMembers(ev.assigned_members)
+    setAssignees(existing.length >= 2 ? existing : [...existing, ...Array(2 - existing.length).fill('')])
     await loadParticipantsForEvent(ev)
     setStep('judge')
   }
@@ -112,24 +127,49 @@ export default function GuestEvaluatePage() {
     if (!event) return
     setSubmitError('')
 
+    // Persist the assignees entered for this event.
+    const cleanAssignees = assignees.map(a => a.trim()).filter(Boolean)
+    await supabase.from('events')
+      .update({ assigned_members: cleanAssignees.length > 0 ? cleanAssignees : null })
+      .eq('id', event.id)
+
+    // Look for marks this judge has already submitted for this event.
     const { data: existing } = await supabase
       .from('guest_marks')
-      .select('id')
+      .select('*')
       .eq('event_id', event.id)
       .eq('judge_number', judgeNumber)
-      .limit(1)
 
-    if ((existing ?? []).length > 0) {
-      setStep('locked')
+    const existingMarks = existing ?? []
+
+    // Resume: load whatever was previously submitted so the judge can
+    // continue where they left off (or see it's already finished).
+    const reset: Record<string, number[]> = {}
+    rows.forEach(r => { reset[rowKey(r.slot_number, r.entry_index)] = emptyScores() })
+    const submitted = new Set<string>()
+    existingMarks.forEach((m: any) => {
+      const k = rowKey(m.slot_number, m.entry_index)
+      submitted.add(k)
+      reset[k] = [...(m.criteria_scores ?? emptyScores())]
+    })
+    setScores(reset)
+    setSubmittedRows(submitted)
+
+    if (existingMarks.length > 0) {
+      // Already finished every row → fully locked for this judge.
+      if (rows.length > 0 && submitted.size >= rows.length) {
+        setStep('locked')
+      } else {
+        // Some rows done — resume the real evaluation, skip the trial.
+        setSearch('')
+        setStep('real')
+      }
       return
     }
 
+    // Brand-new judge — start with the practice trial.
     setTrialNum(1)
-    setScores(prev => {
-      const reset: Record<string, number[]> = {}
-      rows.forEach(r => { reset[rowKey(r.slot_number, r.entry_index)] = emptyScores() })
-      return reset
-    })
+    setTrialSubmitted(false)
     setStep('trial')
   }
 
@@ -141,50 +181,48 @@ export default function GuestEvaluatePage() {
     })
   }
 
-  function finishTrial() {
+  function handleTrialNext() {
+    // Each trial round is a single-student practice — no cycling through everyone.
+    const reset: Record<string, number[]> = {}
+    rows.forEach(r => { reset[rowKey(r.slot_number, r.entry_index)] = emptyScores() })
+    setScores(reset)
+    setTrialSubmitted(false)
     if (trialNum < NUM_TRIALS) {
       setTrialNum(n => n + 1)
-      const reset: Record<string, number[]> = {}
-      rows.forEach(r => { reset[rowKey(r.slot_number, r.entry_index)] = emptyScores() })
-      setScores(reset)
     } else {
-      const reset: Record<string, number[]> = {}
-      rows.forEach(r => { reset[rowKey(r.slot_number, r.entry_index)] = emptyScores() })
-      setScores(reset)
-      setStep('real')
+      setStep('ready')
     }
   }
 
-  async function confirmSubmitMarks() {
+  async function submitRow(r: EntryRow) {
     if (!event || !judgeNumber) return
-    setSubmitting(true)
+    const key = rowKey(r.slot_number, r.entry_index)
+    setSavingRow(key)
     setSubmitError('')
 
-    for (const r of rows) {
-      const key = rowKey(r.slot_number, r.entry_index)
-      const criteriaScores = scores[key] ?? emptyScores()
-      const judgeTotal = criteriaScores.reduce((a, b) => a + (Number(b) || 0), 0)
+    const criteriaScores = scores[key] ?? emptyScores()
+    const judgeTotal = criteriaScores.reduce((a, b) => a + (Number(b) || 0), 0)
 
-      const { error } = await supabase.from('guest_marks').upsert({
-        event_id: event.id,
-        judge_number: judgeNumber,
-        judge_name: judgeName.trim(),
-        slot_number: r.slot_number,
-        entry_index: r.entry_index,
-        criteria_scores: criteriaScores,
-        judge_total: judgeTotal,
-      }, { onConflict: ['event_id', 'judge_number', 'slot_number', 'entry_index'] })
+    const { error } = await supabase.from('guest_marks').upsert({
+      event_id: event.id,
+      judge_number: judgeNumber,
+      judge_name: judgeName.trim(),
+      slot_number: r.slot_number,
+      entry_index: r.entry_index,
+      criteria_scores: criteriaScores,
+      judge_total: judgeTotal,
+    }, { onConflict: ['event_id', 'judge_number', 'slot_number', 'entry_index'] })
 
-      if (error) {
-        setSubmitError('Error saving marks: ' + error.message)
-        setSubmitting(false)
-        return
-      }
+    if (error) {
+      setSubmitError('Error saving marks: ' + error.message)
+      setSavingRow(null)
+      return
     }
 
-    setShowConfirm(false)
-    setSubmitting(false)
-    setStep('done')
+    const newSubmitted = new Set(submittedRows)
+    newSubmitted.add(key)
+    setSubmittedRows(newSubmitted)
+    setSavingRow(null)
   }
 
   function backToStart() {
@@ -193,8 +231,33 @@ export default function GuestEvaluatePage() {
     setEvent(null)
     setJudgeName('')
     setJudgeNumber('')
+    setAssignees(['', ''])
     setRows([])
     setScores({})
+    setTrialNum(1)
+    setTrialSubmitted(false)
+    setSubmittedRows(new Set())
+    setSavingRow(null)
+    setSubmitError('')
+    setSearch('')
+    setShowFinishConfirm(false)
+  }
+
+  // Keep the same event, but evaluate it as a different judge.
+  function pickDifferentJudge() {
+    setJudgeName('')
+    setJudgeNumber('')
+    setSubmittedRows(new Set())
+    setSavingRow(null)
+    setSubmitError('')
+    setSearch('')
+    setShowFinishConfirm(false)
+    setTrialNum(1)
+    setTrialSubmitted(false)
+    const reset: Record<string, number[]> = {}
+    rows.forEach(r => { reset[rowKey(r.slot_number, r.entry_index)] = emptyScores() })
+    setScores(reset)
+    setStep('judge')
   }
 
   function schoolName(slot: number) {
@@ -305,8 +368,43 @@ export default function GuestEvaluatePage() {
             </select>
             <p className="text-xs text-gray-400 mt-1">Your event coordinator will tell you which judge number to pick.</p>
           </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-gray-600">Assigned to this event</label>
+              <button
+                type="button"
+                onClick={() => setAssignees(a => [...a, ''])}
+                className="text-xs text-brand-600 hover:underline flex items-center gap-1"
+              >
+                <Plus size={12} /> Add
+              </button>
+            </div>
+            <div className="space-y-2">
+              {assignees.map((name, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <input
+                    className="input flex-1"
+                    placeholder={`Assignee ${i + 1} name`}
+                    value={name}
+                    onChange={e => setAssignees(a => a.map((v, j) => j === i ? e.target.value : v))}
+                  />
+                  {assignees.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => setAssignees(a => a.filter((_, j) => j !== i))}
+                      className="text-red-400 hover:text-red-600 shrink-0"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
           {submitError && <p className="text-sm text-red-600">{submitError}</p>}
-          <button onClick={submitJudgeInfo} className="btn-primary w-full">Submit</button>
+          <button onClick={submitJudgeInfo} className="btn-primary w-full">Continue</button>
         </div>
       </div>
     )
@@ -319,31 +417,37 @@ export default function GuestEvaluatePage() {
         <Lock size={36} className="mx-auto text-amber-500" />
         <h2 className="text-xl font-bold text-gray-900">Already Submitted</h2>
         <p className="text-gray-500 text-sm">
-          Judge {judgeNumber} has already submitted marks for "{event.name}". Marks cannot be changed once submitted.
+          Judge {judgeNumber} has already finished evaluating "{event.name}". Those marks can't be changed. Please continue as a different judge.
         </p>
-        <button onClick={() => setStep('judge')} className="btn-secondary">Pick a different judge number</button>
+        <button onClick={pickDifferentJudge} className="btn-primary">Pick a different judge</button>
+        <div><button onClick={backToStart} className="btn-secondary">Evaluate another event</button></div>
       </div>
     )
   }
 
-  // ── Step: trial / real marks entry (shared table UI) ──
-  if ((step === 'trial' || step === 'real') && event) {
-    const isTrial = step === 'trial'
+  // ── Step: trial — single-student practice (same row layout as real eval) ──
+  if (step === 'trial' && event) {
+    const totalCriteria = event.criteria_count ?? 4
+    // Practice on just one sample student per round.
+    const currentRow = rows[0]
+    const key = currentRow ? rowKey(currentRow.slot_number, currentRow.entry_index) : 'trial'
+    const rowScores = scores[key] ?? emptyScores()
+    const total = rowScores.reduce((a, b) => a + (Number(b) || 0), 0)
+    const isLastTrial = trialNum >= NUM_TRIALS
+
     return (
       <div className="max-w-4xl mx-auto space-y-5">
-        {isTrial ? (
-          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2">
-            <FlaskConical size={15} /> Practice round {trialNum} of {NUM_TRIALS} — nothing here will be saved.
-          </div>
-        ) : (
-          <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2">
-            <ClipboardList size={15} /> Real evaluation — Judge {judgeNumber} ({judgeName})
-          </div>
-        )}
+        <button onClick={() => setStep('judge')} className="text-sm text-gray-500 hover:text-brand-600 flex items-center gap-1.5">
+          <ArrowLeft size={14} /> Back
+        </button>
+        {/* Trial header */}
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2">
+          <FlaskConical size={15} /> Trial Round {trialNum} of {NUM_TRIALS} — practice only, nothing here is saved
+        </div>
 
         <div>
           <h2 className="text-2xl font-bold text-gray-900">{event.name}</h2>
-          <p className="text-gray-500 text-sm mt-1">Enter a score for each criterion, for every participant.</p>
+          <p className="text-gray-500 text-sm mt-1">Practice entering scores for one sample student — just like the real round.</p>
         </div>
 
         <div className="card p-0 overflow-hidden">
@@ -351,21 +455,156 @@ export default function GuestEvaluatePage() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 border border-gray-100">Slot Number</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 border border-gray-100">Participant Name</th>
-                  {Array.from({ length: event.criteria_count ?? 4 }, (_, i) => (
-                    <th key={i} className="px-2 py-2 text-xs font-semibold text-gray-500 border border-gray-100 text-center">Criteria {i + 1}</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 border border-gray-100">Slot</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 border border-gray-100">Participant</th>
+                  {Array.from({ length: totalCriteria }, (_, i) => (
+                    <th key={i} className="px-2 py-2 text-xs font-semibold text-gray-500 border border-gray-100 text-center">{criteriaLabel(i)}</th>
                   ))}
                   <th className="px-3 py-2 text-xs font-semibold text-gray-500 border border-gray-100 text-center">Total</th>
+                  <th className="px-3 py-2 text-xs font-semibold text-gray-500 border border-gray-100 text-center">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map(r => {
+                <tr className={trialSubmitted ? 'bg-green-50/40' : 'hover:bg-gray-50'}>
+                  <td className="px-3 py-2 border border-gray-100 font-medium text-gray-700">{currentRow?.slot_number ?? '—'}</td>
+                  <td className="px-3 py-2 border border-gray-100">
+                    <p className="text-gray-800">{currentRow ? (currentRow.names || `Slot ${currentRow.slot_number}`) : 'Practice entry'}</p>
+                    {currentRow && <p className="text-xs text-gray-400">{schoolName(currentRow.slot_number)}</p>}
+                  </td>
+                  {rowScores.map((val, i) => (
+                    <td key={i} className="px-2 py-1.5 border border-gray-100">
+                      <MarkSelect value={val} onChange={n => setScore(key, i, n)} disabled={trialSubmitted} />
+                    </td>
+                  ))}
+                  <td className="px-3 py-2 border border-gray-100 text-center font-semibold text-gray-700">
+                    {trialSubmitted ? total : <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-3 py-2 border border-gray-100 text-center">
+                    {trialSubmitted ? (
+                      <span className="text-xs text-green-600 font-medium flex items-center gap-1 justify-center">
+                        <CheckCircle2 size={12} /> Submitted
+                      </span>
+                    ) : (
+                      <button onClick={() => setTrialSubmitted(true)} className="btn-primary text-xs px-3 py-1">
+                        Submit
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <button onClick={handleTrialNext} disabled={!trialSubmitted} className="btn-primary w-full sm:w-auto">
+          {isLastTrial ? 'Done — Ready to Evaluate' : 'Next Trial Round'}
+        </button>
+      </div>
+    )
+  }
+
+  // ── Step: all trials done, ready to start real eval ──
+  if (step === 'ready' && event) {
+    return (
+      <div className="max-w-md mx-auto text-center space-y-6 py-10">
+        <CheckCircle2 size={48} className="mx-auto text-green-500" />
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">All good!</h2>
+          <p className="text-gray-500 text-sm mt-2">Practice complete. You're ready to evaluate for real.</p>
+        </div>
+        <div className="card text-left">
+          <p className="text-base font-semibold text-gray-800">{event.name}</p>
+          {event.venue && <p className="text-sm text-gray-500 mt-1 flex items-center gap-1"><MapPin size={13} /> {event.venue}</p>}
+          {event.rules && (
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Rules</p>
+              <p className="text-sm text-gray-600 whitespace-pre-wrap">{event.rules}</p>
+            </div>
+          )}
+        </div>
+        <button
+          onClick={() => { setSubmittedRows(new Set()); setStep('real') }}
+          className="btn-primary w-full text-base py-3"
+        >
+          Start Evaluation
+        </button>
+      </div>
+    )
+  }
+
+  // ── Step: real marks entry ──
+  if (step === 'real' && event) {
+    const totalCriteria = event.criteria_count ?? 4
+    const q = search.trim().toLowerCase()
+    const visibleRows = q
+      ? rows.filter(r => String(r.slot_number).includes(q)
+          || r.names.toLowerCase().includes(q)
+          || (schoolName(r.slot_number) ?? '').toLowerCase().includes(q))
+      : rows
+
+    const allDone = rows.length > 0 && submittedRows.size >= rows.length
+
+    return (
+      <div className="max-w-4xl mx-auto space-y-5">
+        <button onClick={() => setStep('judge')} className="text-sm text-gray-500 hover:text-brand-600 flex items-center gap-1.5">
+          <ArrowLeft size={14} /> Back / pause — submitted rows are saved
+        </button>
+        <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2">
+          <ClipboardList size={15} /> Real evaluation — Judge {judgeNumber} ({judgeName})
+        </div>
+
+        {event.rules && (
+          <div className="card">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Rules</p>
+            <p className="text-sm text-gray-600 whitespace-pre-wrap">{event.rules}</p>
+          </div>
+        )}
+
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">{event.name}</h2>
+          <p className="text-gray-500 text-sm mt-1">Enter scores for each criterion, then submit each row.</p>
+        </div>
+
+        {/* Search — find a slot fast on mobile instead of scrolling */}
+        <div className="relative">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search slot number, participant or school…"
+            className="input pl-9"
+            inputMode="search"
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <X size={15} />
+            </button>
+          )}
+        </div>
+
+        <div className="card p-0 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 border border-gray-100">Slot</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 border border-gray-100">Participant</th>
+                  {Array.from({ length: totalCriteria }, (_, i) => (
+                    <th key={i} className="px-2 py-2 text-xs font-semibold text-gray-500 border border-gray-100 text-center">{criteriaLabel(i)}</th>
+                  ))}
+                  <th className="px-3 py-2 text-xs font-semibold text-gray-500 border border-gray-100 text-center">Total</th>
+                  <th className="px-3 py-2 text-xs font-semibold text-gray-500 border border-gray-100 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleRows.map(r => {
                   const key = rowKey(r.slot_number, r.entry_index)
                   const rowScores = scores[key] ?? emptyScores()
                   const total = rowScores.reduce((a, b) => a + (Number(b) || 0), 0)
+                  const isSubmitted = submittedRows.has(key)
+                  const isSaving = savingRow === key
                   return (
-                    <tr key={key} className="hover:bg-gray-50">
+                    <tr key={key} className={isSubmitted ? 'bg-green-50/40' : 'hover:bg-gray-50'}>
                       <td className="px-3 py-2 border border-gray-100 font-medium text-gray-700">{r.slot_number}</td>
                       <td className="px-3 py-2 border border-gray-100">
                         <p className="text-gray-800">{r.names}</p>
@@ -373,17 +612,27 @@ export default function GuestEvaluatePage() {
                       </td>
                       {rowScores.map((val, i) => (
                         <td key={i} className="px-2 py-1.5 border border-gray-100">
-                          <input
-                            type="number"
-                            min={0}
-                            value={val || ''}
-                            placeholder="0"
-                            onChange={e => setScore(key, i, e.target.value === '' ? 0 : Number(e.target.value))}
-                            className="input w-16 text-center py-1 mx-auto block"
-                          />
+                          <MarkSelect value={val} onChange={n => setScore(key, i, n)} disabled={isSubmitted} />
                         </td>
                       ))}
-                      <td className="px-3 py-2 border border-gray-100 text-center font-semibold text-gray-700">{total}</td>
+                      <td className="px-3 py-2 border border-gray-100 text-center font-semibold text-gray-700">
+                        {isSubmitted ? total : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-3 py-2 border border-gray-100 text-center">
+                        {isSubmitted ? (
+                          <span className="text-xs text-green-600 font-medium flex items-center gap-1 justify-center">
+                            <CheckCircle2 size={12} /> Submitted
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => submitRow(r)}
+                            disabled={!!isSaving}
+                            className="btn-primary text-xs px-3 py-1"
+                          >
+                            {isSaving ? 'Saving…' : 'Submit'}
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   )
                 })}
@@ -395,29 +644,38 @@ export default function GuestEvaluatePage() {
         {rows.length === 0 && (
           <div className="card text-center text-gray-400 py-10">No participants registered for this event yet.</div>
         )}
-
-        {submitError && <p className="text-sm text-red-600">{submitError}</p>}
-
-        {isTrial ? (
-          <button onClick={finishTrial} className="btn-primary">
-            {trialNum < NUM_TRIALS ? 'Next Practice Round' : 'Start Real Evaluation'}
-          </button>
-        ) : (
-          <button onClick={() => setShowConfirm(true)} className="btn-primary flex items-center gap-2">
-            <Send size={14} /> Submit Marks
-          </button>
+        {rows.length > 0 && visibleRows.length === 0 && (
+          <div className="card text-center text-gray-400 py-8 text-sm">No slots match "{search}".</div>
         )}
 
-        {showConfirm && (
+        {submitError && <p className="text-sm text-red-600">{submitError}</p>}
+        <p className="text-xs text-gray-400">{submittedRows.size} of {rows.length} rows submitted. Marks are locked per row after submission.</p>
+
+        {rows.length > 0 && (
+          <div className="flex flex-col sm:flex-row gap-3 pt-1">
+            <button onClick={() => setShowFinishConfirm(true)} className="btn-primary flex items-center gap-2">
+              <CheckCircle2 size={15} /> Finish Evaluating Event
+            </button>
+            {!allDone && (
+              <p className="text-xs text-amber-600 sm:self-center">
+                {rows.length - submittedRows.size} row(s) not yet submitted — you can finish now and resume later as this judge.
+              </p>
+            )}
+          </div>
+        )}
+
+        {showFinishConfirm && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4">
-              <h3 className="font-semibold text-gray-900">Submit marks?</h3>
-              <p className="text-sm text-gray-600">Are you sure you want to submit the marks? You cannot change the marks.</p>
+              <h3 className="font-semibold text-gray-900">Finish evaluating this event?</h3>
+              <p className="text-sm text-gray-600">
+                {allDone
+                  ? 'All rows are submitted. You\'ll be asked to continue as a different judge.'
+                  : `${submittedRows.size} of ${rows.length} rows are submitted. You can come back to this judge later to finish the rest.`}
+              </p>
               <div className="flex gap-2 justify-end">
-                <button onClick={() => setShowConfirm(false)} className="btn-secondary text-sm">Cancel</button>
-                <button onClick={confirmSubmitMarks} disabled={submitting} className="btn-primary text-sm">
-                  {submitting ? 'Submitting…' : 'Yes, Submit'}
-                </button>
+                <button onClick={() => setShowFinishConfirm(false)} className="btn-secondary text-sm">Keep evaluating</button>
+                <button onClick={() => { setShowFinishConfirm(false); setStep('done') }} className="btn-primary text-sm">Finish</button>
               </div>
             </div>
           </div>
@@ -428,14 +686,19 @@ export default function GuestEvaluatePage() {
 
   // ── Step: done ──
   if (step === 'done' && event) {
+    const allDone = rows.length > 0 && submittedRows.size >= rows.length
     return (
       <div className="max-w-md mx-auto space-y-5 text-center py-14">
         <CheckCircle2 size={40} className="mx-auto text-green-600" />
-        <h2 className="text-2xl font-bold text-gray-900">Thank you for evaluating!</h2>
+        <h2 className="text-2xl font-bold text-gray-900">{allDone ? 'Thank you for evaluating!' : 'Progress saved'}</h2>
         <p className="text-gray-500 text-sm">
-          Your marks for "{event.name}" as Judge {judgeNumber} have been submitted and locked.
+          {allDone
+            ? `All marks for "${event.name}" as Judge ${judgeNumber} have been submitted and locked.`
+            : `${submittedRows.size} of ${rows.length} rows saved for "${event.name}" as Judge ${judgeNumber}. Re-select Judge ${judgeNumber} any time to finish the rest.`}
         </p>
-        <button onClick={backToStart} className="btn-secondary">Evaluate another event</button>
+        <p className="text-sm font-medium text-gray-700">Please continue as a different judge.</p>
+        <button onClick={pickDifferentJudge} className="btn-primary">Select a different judge</button>
+        <div><button onClick={backToStart} className="btn-secondary">Evaluate another event</button></div>
       </div>
     )
   }

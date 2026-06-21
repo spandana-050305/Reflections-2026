@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { Pencil, Trash2, Check, X, PlusCircle, ClipboardList, Users, CheckCircle2, XCircle, FileDown } from 'lucide-react'
+import { Pencil, Trash2, Check, X, ClipboardList, Users, CheckCircle2, XCircle, FileDown } from 'lucide-react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
@@ -27,7 +27,6 @@ export default function ClubParticipantsPage() {
   const [participants, setParticipants] = useState<any[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
-  const [saving, setSaving] = useState(false)
 
   // ── On-spot tab ──────────────────────────────────────────────────────────
   const [onspots, setOnspots] = useState<any[]>([])
@@ -38,7 +37,6 @@ export default function ClubParticipantsPage() {
     amount_paid: false,
   })
   const [onspotSaving, setOnspotSaving] = useState(false)
-  const [editOnspotId, setEditOnspotId] = useState<string | null>(null)
   const [onspotFilter, setOnspotFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
   const [eventSearch, setEventSearch] = useState('')
   const [showEventPicker, setShowEventPicker] = useState(false)
@@ -331,7 +329,7 @@ export default function ClubParticipantsPage() {
                           {editingId === p.id ? (
                             <div className="flex items-center gap-2 flex-1">
                               <input value={editName} onChange={e => setEditName(e.target.value)} className="input flex-1" autoFocus />
-                              <button onClick={async () => { setSaving(true); await supabase.from('participants').update({ participant_name: editName }).eq('id', p.id); setEditingId(null); setSaving(false); loadParticipants(selectedEvent) }} className="btn-primary px-2 py-1"><Check size={14} /></button>
+                              <button onClick={async () => { await supabase.from('participants').update({ participant_name: editName }).eq('id', p.id); setEditingId(null); loadParticipants(selectedEvent) }} className="btn-primary px-2 py-1"><Check size={14} /></button>
                               <button onClick={() => setEditingId(null)} className="btn-secondary px-2 py-1"><X size={14} /></button>
                             </div>
                           ) : (

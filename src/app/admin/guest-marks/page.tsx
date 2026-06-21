@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { ChevronDown, ChevronRight, Trophy, Users, AlertCircle, ClipboardCheck } from 'lucide-react'
+import {
+  ChevronDown, ChevronRight, Trophy, Users, AlertCircle, ClipboardCheck,
+  Pencil, Lock, Unlock, Settings2,
+} from 'lucide-react'
 import type { Category, Event } from '@/lib/types'
 
 const eKey = (slot: number, entry: number) => `${slot}_${entry}`
@@ -24,28 +27,58 @@ export default function AdminGuestMarksPage() {
   const [saving, setSaving] = useState(false)
   const [flashMsg, setFlashMsg] = useState('')
   const [computeTarget, setComputeTarget] = useState<string | null>(null)
+  const [lockAllTarget, setLockAllTarget] = useState<string | null>(null)
+  const [fullUnlockTarget, setFullUnlockTarget] = useState<string | null>(null)
+
+  // Points settings (place points)
+  const [draftPts, setDraftPts] = useState({ p1: 15, p2: 10, p3: 5 })
+  const [showPtsPanel, setShowPtsPanel] = useState(false)
+  const [savingPts, setSavingPts] = useState(false)
+
+  // Edit modal state
+  const [editModal, setEditModal] = useState<{
+    eventId: string
+    judgeNumber: number
+    judgeName: string
+    slot: number
+    entry: number
+    scores: number[]
+  } | null>(null)
+  const [editSaving, setEditSaving] = useState(false)
 
   function flash(msg: string) { setFlashMsg(msg); setTimeout(() => setFlashMsg(''), 3500) }
 
   async function load() {
-    const [{ data: cats }, { data: evs }, { data: gm }, { data: parts }, { data: resultData }] = await Promise.all([
+    const [{ data: cats }, { data: evs }, { data: gm }, { data: parts }, { data: resultData }, { data: stg }] = await Promise.all([
       supabase.from('categories').select('*').order('display_order'),
       supabase.from('events').select('*').order('name'),
       supabase.from('guest_marks').select('*'),
       supabase.from('participants').select('slot_number, event_id, entry_index, member_index, participant_name').order('entry_index').order('member_index'),
       supabase.from('results').select('*'),
+      supabase.from('settings').select('*').single(),
     ])
     setCategories(cats ?? [])
     setEvents((evs as Event[]) ?? [])
-    if (cats?.[0]) setSelectedCat(cats[0].id)
+    if (cats?.[0]) setSelectedCat(prev => prev || cats[0].id)
     setGuestMarks(gm ?? [])
     setParticipants(parts ?? [])
     const res: Record<string, any> = {}
     ;(resultData ?? []).forEach((r: any) => { res[r.event_id] = r })
     setResults(res)
+    if (stg) {
+      setDraftPts({ p1: stg.points_1st ?? 15, p2: stg.points_2nd ?? 10, p3: stg.points_3rd ?? 5 })
+    }
   }
 
   useEffect(() => { load() }, [])
+
+  async function savePoints() {
+    setSavingPts(true)
+    await supabase.from('settings').update({ points_1st: draftPts.p1, points_2nd: draftPts.p2, points_3rd: draftPts.p3 })
+    setShowPtsPanel(false)
+    flash(`Points updated: 1st=${draftPts.p1} · 2nd=${draftPts.p2} · 3rd=${draftPts.p3}`)
+    setSavingPts(false)
+  }
 
   // namesByEvent[eventId][slot_entry] = "names joined"
   const namesByEvent = useMemo(() => {
@@ -86,15 +119,100 @@ export default function AdminGuestMarksPage() {
     return out.sort((a, b) => a.slot - b.slot || a.entry - b.entry)
   }
 
+  function rowsFor(eventId: string, slot: number, entry: number) {
+    return guestMarks.filter(m => m.event_id === eventId && m.slot_number === slot && m.entry_index === entry)
+  }
+
   function markFor(eventId: string, judgeNumber: number, slot: number, entry: number) {
     return guestMarks.find(m => m.event_id === eventId && m.judge_number === judgeNumber && m.slot_number === slot && m.entry_index === entry)
   }
 
   function avgTotal(eventId: string, slot: number, entry: number): number | null {
-    const rows = guestMarks.filter(m => m.event_id === eventId && m.slot_number === slot && m.entry_index === entry)
+    const rows = rowsFor(eventId, slot, entry)
     if (rows.length === 0) return null
     const sum = rows.reduce((a, r) => a + (Number(r.judge_total) || 0), 0)
     return Math.round((sum / rows.length) * 100) / 100
+  }
+
+  // ── Lock helpers ───────────────────────────────────────────────────────────
+  function isEntryLocked(eventId: string, slot: number, entry: number): boolean {
+    const rows = rowsFor(eventId, slot, entry)
+    return rows.length > 0 && rows.every(r => r.locked === true)
+  }
+  function allEntriesLocked(eventId: string): boolean {
+    const entries = entriesForEvent(eventId)
+    return entries.length > 0 && entries.every(({ slot, entry }) => isEntryLocked(eventId, slot, entry))
+  }
+
+  async function setEntryLock(eventId: string, slot: number, entry: number, locked: boolean) {
+    const rows = rowsFor(eventId, slot, entry)
+    for (const r of rows) {
+      await supabase.from('guest_marks').upsert({
+        event_id: eventId, judge_number: r.judge_number, judge_name: r.judge_name,
+        slot_number: slot, entry_index: entry,
+        criteria_scores: r.criteria_scores, judge_total: r.judge_total, locked,
+      }, { onConflict: ['event_id', 'judge_number', 'slot_number', 'entry_index'] })
+    }
+  }
+
+  async function lockEntry(eventId: string, slot: number, entry: number) {
+    setSaving(true)
+    await setEntryLock(eventId, slot, entry, true)
+    await load()
+    flash(`Slot ${slot} locked ✓`)
+    setSaving(false)
+  }
+
+  async function unlockEntry(eventId: string, slot: number, entry: number) {
+    setSaving(true)
+    await setEntryLock(eventId, slot, entry, false)
+    await load()
+    flash(`Slot ${slot} unlocked ✓`)
+    setSaving(false)
+  }
+
+  async function lockAll(eventId: string) {
+    setSaving(true)
+    for (const { slot, entry } of entriesForEvent(eventId)) {
+      await setEntryLock(eventId, slot, entry, true)
+    }
+    await load()
+    flash('All marks locked ✓')
+    setSaving(false)
+    setLockAllTarget(null)
+  }
+
+  async function fullUnlock(eventId: string) {
+    setSaving(true)
+    for (const { slot, entry } of entriesForEvent(eventId)) {
+      await setEntryLock(eventId, slot, entry, false)
+    }
+    await supabase.from('results').delete().eq('event_id', eventId)
+    await load()
+    flash('Fully unlocked ✓')
+    setSaving(false)
+    setFullUnlockTarget(null)
+  }
+
+  async function saveEditedMark() {
+    if (!editModal) return
+    setEditSaving(true)
+    const { eventId, judgeNumber, judgeName: jName, slot, entry, scores } = editModal
+    const judgeTotal = scores.reduce((a, b) => a + (Number(b) || 0), 0)
+    await supabase.from('guest_marks').upsert({
+      event_id: eventId,
+      judge_number: judgeNumber,
+      judge_name: jName,
+      slot_number: slot,
+      entry_index: entry,
+      criteria_scores: scores,
+      judge_total: judgeTotal,
+      locked: false,
+    }, { onConflict: ['event_id', 'judge_number', 'slot_number', 'entry_index'] })
+    await load()
+    flash('Marks updated ✓')
+    setEditModal(null)
+    setEditSaving(false)
   }
 
   async function computeWinners(eventId: string) {
@@ -133,20 +251,39 @@ export default function AdminGuestMarksPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <ClipboardCheck size={22} className="text-brand-600" /> Guest Marks
-        </h2>
-        <p className="text-sm text-gray-500">Marks submitted by guest evaluators, averaged across judges</p>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <ClipboardCheck size={22} className="text-brand-600" /> Guest Marks
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">Marks submitted by judges, averaged · lock to finalize</p>
+        </div>
+        <button onClick={() => setShowPtsPanel(v => !v)} className="btn-secondary flex items-center gap-2 text-sm">
+          <Settings2 size={15} /> Points Config
+        </button>
       </div>
 
       {flashMsg && (
         <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-2.5 rounded-xl text-sm font-medium">{flashMsg}</div>
       )}
 
+      {showPtsPanel && (
+        <div className="card flex flex-wrap items-end gap-4">
+          {(['p1','p2','p3'] as const).map((k, i) => (
+            <div key={k}>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{i+1}{i===0?'st':i===1?'nd':'rd'} place pts</label>
+              <input type="number" min={0} value={draftPts[k]}
+                onChange={e => setDraftPts(v => ({ ...v, [k]: +e.target.value }))}
+                className="input w-20" />
+            </div>
+          ))}
+          <button onClick={savePoints} disabled={savingPts} className="btn-primary">{savingPts ? 'Saving…' : 'Save'}</button>
+        </div>
+      )}
+
       <div className="flex gap-2 flex-wrap">
         {categories.map(c => (
           <button key={c.id} onClick={() => setSelectedCat(c.id)}
-            className={`px-4 py-2 rounded-full text-sm font-medium ${selectedCat===c.id ? 'bg-brand-600 text-white' : 'bg-white border border-gray-200 text-gray-600'}`}>
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${selectedCat===c.id ? 'bg-brand-600 text-white shadow-glow' : 'bg-white border border-gray-200 text-gray-600 hover:border-brand-300'}`}>
             {c.name}
           </button>
         ))}
@@ -157,6 +294,7 @@ export default function AdminGuestMarksPage() {
         const judges = judgesForEvent(ev.id)
         const entries = entriesForEvent(ev.id)
         const result = results[ev.id]
+        const allLocked = allEntriesLocked(ev.id)
         const winnerGroups: WinnerGroup[] = result?.winners_json
           ? (() => { try { return JSON.parse(result.winners_json) } catch { return [] } })() : []
 
@@ -169,8 +307,10 @@ export default function AdminGuestMarksPage() {
                 <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
                   <Users size={10} /> {judges.length} judge{judges.length === 1 ? '' : 's'} submitted
                 </span>
-                {result && (
-                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Winners computed</span>
+                {entries.length > 0 && allLocked && (
+                  result
+                    ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1"><Lock size={10} /> Finalized</span>
+                    : <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1"><Lock size={10} /> Marks locked</span>
                 )}
               </div>
               {isOpen ? <ChevronDown size={18} className="text-gray-400" /> : <ChevronRight size={18} className="text-gray-400" />}
@@ -194,26 +334,46 @@ export default function AdminGuestMarksPage() {
                             </th>
                           ))}
                           <th className="px-3 py-2 text-xs font-semibold text-gray-500 border border-gray-100 text-center">Avg Total</th>
+                          <th className="px-3 py-2 text-xs font-semibold text-gray-500 border border-gray-100 text-center">Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {entries.map(({ slot, entry }) => {
                           const names = namesByEvent[ev.id]?.[eKey(slot, entry)] ?? ''
                           const avg = avgTotal(ev.id, slot, entry)
+                          const locked = isEntryLocked(ev.id, slot, entry)
                           return (
-                            <tr key={eKey(slot, entry)} className="hover:bg-gray-50">
+                            <tr key={eKey(slot, entry)} className={locked ? 'bg-gray-50/60' : 'hover:bg-gray-50'}>
                               <td className="px-3 py-2 border border-gray-100 font-medium text-gray-700">{slot}</td>
                               <td className="px-3 py-2 border border-gray-100 text-gray-800">{names || '—'}</td>
                               {judges.map(j => {
                                 const m = markFor(ev.id, j.judge_number, slot, entry)
                                 return (
-                                  <td key={j.judge_number} className="px-3 py-2 border border-gray-100 text-center text-gray-700"
-                                    title={m ? `Criteria: ${(m.criteria_scores ?? []).join(', ')}` : 'Not submitted'}>
-                                    {m ? m.judge_total : <span className="text-gray-300">—</span>}
+                                  <td key={j.judge_number} className="px-3 py-2 border border-gray-100 text-center text-gray-700">
+                                    {m ? (
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <span title={`Criteria: ${(m.criteria_scores ?? []).join(', ')}`}>{m.judge_total}</span>
+                                        {!locked && (
+                                          <button
+                                            onClick={() => setEditModal({ eventId: ev.id, judgeNumber: j.judge_number, judgeName: j.judge_name, slot, entry, scores: [...(m.criteria_scores ?? [])] })}
+                                            className="text-amber-500 hover:text-amber-700"
+                                            title="Edit marks"
+                                          >
+                                            <Pencil size={12} />
+                                          </button>
+                                        )}
+                                      </div>
+                                    ) : <span className="text-gray-300">—</span>}
                                   </td>
                                 )
                               })}
                               <td className="px-3 py-2 border border-gray-100 text-center font-semibold text-gray-900">{avg ?? '—'}</td>
+                              <td className="px-3 py-2 border border-gray-100 text-center">
+                                {locked
+                                  ? <button onClick={() => unlockEntry(ev.id, slot, entry)} disabled={saving} className="text-xs text-amber-600 hover:underline flex items-center gap-1 mx-auto"><Unlock size={11} />Unlock</button>
+                                  : <button onClick={() => lockEntry(ev.id, slot, entry)} disabled={saving} className="text-xs text-gray-500 hover:text-brand-600 hover:underline flex items-center gap-1 mx-auto"><Lock size={11} />Lock</button>
+                                }
+                              </td>
                             </tr>
                           )
                         })}
@@ -223,9 +383,27 @@ export default function AdminGuestMarksPage() {
                 )}
 
                 {entries.length > 0 && (
-                  <button onClick={() => setComputeTarget(ev.id)} disabled={saving} className="btn-primary flex items-center gap-2">
-                    <Trophy size={14} /> Compute Winners
-                  </button>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {!allLocked && (
+                      <button onClick={() => setLockAllTarget(ev.id)} disabled={saving} className="btn-secondary flex items-center gap-2">
+                        <Lock size={14} /> Lock All
+                      </button>
+                    )}
+                    {allLocked && !result && (
+                      <button onClick={() => setComputeTarget(ev.id)} disabled={saving} className="btn-primary flex items-center gap-2">
+                        <Trophy size={14} /> Compute Winners
+                      </button>
+                    )}
+                    {result && (
+                      <button onClick={() => setFullUnlockTarget(ev.id)} disabled={saving} className="btn-danger flex items-center gap-2">
+                        <Unlock size={14} /> Full Unlock
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {entries.length > 0 && !allLocked && (
+                  <p className="text-xs text-gray-400">Lock all marks to compute winners.</p>
                 )}
 
                 {winnerGroups.length > 0 && (
@@ -251,9 +429,25 @@ export default function AdminGuestMarksPage() {
         <div className="card text-center text-gray-400 py-10">No events in this category.</div>
       )}
 
+      {lockAllTarget && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl space-y-4 animate-scale-in">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="text-amber-500 shrink-0" size={22} />
+              <p className="font-semibold text-gray-900">Lock all marks?</p>
+            </div>
+            <p className="text-sm text-gray-500">This locks every judge's marks for this event so they can't be edited. You can unlock individual slots or use Full Unlock later.</p>
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => lockAll(lockAllTarget)} className="btn-primary flex-1">Lock All</button>
+              <button onClick={() => setLockAllTarget(null)} className="btn-secondary flex-1">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {computeTarget && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl space-y-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl space-y-4 animate-scale-in">
             <div className="flex items-center gap-3">
               <AlertCircle className="text-amber-500 shrink-0" size={22} />
               <p className="font-semibold text-gray-900">Compute winners for this event?</p>
@@ -262,6 +456,60 @@ export default function AdminGuestMarksPage() {
             <div className="flex gap-3 pt-1">
               <button onClick={() => computeWinners(computeTarget)} className="btn-primary flex-1">Compute</button>
               <button onClick={() => setComputeTarget(null)} className="btn-secondary flex-1">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {fullUnlockTarget && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl space-y-4 animate-scale-in">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="text-red-500 shrink-0" size={22} />
+              <p className="font-semibold text-gray-900">Full unlock?</p>
+            </div>
+            <p className="text-sm text-gray-500">Unlocks all marks and deletes the computed winners for this event. Cannot be undone.</p>
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => fullUnlock(fullUnlockTarget)} className="btn-danger flex-1">Unlock Everything</button>
+              <button onClick={() => setFullUnlockTarget(null)} className="btn-secondary flex-1">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit judge marks modal */}
+      {editModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl space-y-4 animate-scale-in">
+            <div>
+              <h3 className="font-semibold text-gray-900">Edit Marks — Judge {editModal.judgeNumber}</h3>
+              <p className="text-sm text-gray-500 mt-0.5">{editModal.judgeName} · Slot {editModal.slot}, Entry {editModal.entry}</p>
+            </div>
+            <div className="space-y-3">
+              {editModal.scores.map((val, i) => (
+                <div key={i} className="flex items-center justify-between gap-4">
+                  <label className="text-sm text-gray-600">Criteria {i + 1}</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={val || ''}
+                    placeholder="0"
+                    onChange={e => {
+                      const next = [...editModal.scores]
+                      next[i] = e.target.value === '' ? 0 : Number(e.target.value)
+                      setEditModal({ ...editModal, scores: next })
+                    }}
+                    className="input w-20 text-center"
+                  />
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400">New total: {editModal.scores.reduce((a, b) => a + (Number(b) || 0), 0)}</p>
+            <div className="flex gap-2 pt-1">
+              <button onClick={saveEditedMark} disabled={editSaving} className="btn-primary flex-1">
+                {editSaving ? 'Saving…' : 'Save Marks'}
+              </button>
+              <button onClick={() => setEditModal(null)} className="btn-secondary flex-1">Cancel</button>
             </div>
           </div>
         </div>

@@ -20,7 +20,7 @@ export default async function ClubLayout({ children }: { children: React.ReactNo
     <div className="min-h-screen flex flex-col">
       <NavBar title="Club Member Portal" role="club_member" />
       <div className="flex flex-1">
-        <aside className="w-60 bg-white/60 backdrop-blur border-r border-slate-200 hidden md:block">
+        <aside className="w-60 bg-white/50 backdrop-blur-xl border-r border-white/60 hidden md:block">
           <nav className="p-3 space-y-1">
             {navLinks.map(({ href, label, icon: Icon }) => (
               <NavLink key={href} href={href} label={label}>
@@ -30,7 +30,7 @@ export default async function ClubLayout({ children }: { children: React.ReactNo
           </nav>
         </aside>
 
-        <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur border-t border-slate-200 flex md:hidden z-20">
+        <nav className="fixed bottom-3 left-3 right-3 bg-white/85 backdrop-blur-xl border border-white/60 rounded-2xl shadow-card-hover flex md:hidden z-20 p-1.5">
           {navLinks.map(({ href, label, icon: Icon }) => (
             <div key={href} className="flex-1 flex justify-center">
               <NavLink href={href} label={label} variant="mobile">
@@ -40,7 +40,7 @@ export default async function ClubLayout({ children }: { children: React.ReactNo
           ))}
         </nav>
 
-        <main className="flex-1 p-4 sm:p-6 pb-24 md:pb-8 overflow-auto">{children}</main>
+        <main className="flex-1 p-4 sm:p-6 pb-28 md:pb-8 overflow-auto">{children}</main>
       </div>
     </div>
   )

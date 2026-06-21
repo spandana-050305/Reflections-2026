@@ -1,17 +1,17 @@
 import { createClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import { Calendar, MapPin, User } from 'lucide-react'
-import type { Event, Category } from '@/lib/types'
 
 export default async function ClubSchedulePage() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/')
 
-  const [{ data: events }, { data: categories }] = await Promise.all([
-    supabase.from('events').select('*, categories(name, display_order)').order('event_date').order('event_time'),
-    supabase.from('categories').select('*').order('display_order'),
-  ])
+  const { data: events } = await supabase
+    .from('events')
+    .select('*, categories(name, display_order)')
+    .order('event_date')
+    .order('event_time')
 
   const scheduledEvents = (events as any[] ?? []).filter(e => e.event_date)
   const unscheduled = (events as any[] ?? []).filter(e => !e.event_date)

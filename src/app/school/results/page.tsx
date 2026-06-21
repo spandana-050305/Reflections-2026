@@ -31,13 +31,11 @@ export default async function SchoolResultsPage() {
 
   const slotNumber = user.user_metadata?.slot_number as number
 
-  const [{ data: results }, { data: categories }] = await Promise.all([
-    supabase.from('results')
-      .select('*, events(*, categories(name, display_order))')
-      .eq('published', true)
-      .order('created_at', { ascending: false }),
-    supabase.from('categories').select('*').order('display_order'),
-  ])
+  const { data: results } = await supabase
+    .from('results')
+    .select('*, events(*, categories(name, display_order))')
+    .eq('published', true)
+    .order('created_at', { ascending: false })
 
   // Group published results by category
   const byCat: Record<string, any[]> = {}

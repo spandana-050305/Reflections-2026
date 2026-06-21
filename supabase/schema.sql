@@ -218,3 +218,94 @@ CREATE POLICY "admin_delete_rulebooks" ON storage.objects
     bucket_id = 'rulebooks'
     AND get_user_role() = 'final_year'
   );
+
+-- ============================================================
+-- CURRENT DATA MODEL — added after the base schema above.
+-- These bring the DB in line with the app as it stands today.
+-- Safe to run on an existing database (all idempotent).
+-- ============================================================
+
+-- ── EVENTS: judging criteria + rules ─────────────────────────
+ALTER TABLE events ADD COLUMN IF NOT EXISTS criteria_count  INTEGER NOT NULL DEFAULT 4;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS criteria_names  JSONB;          -- ["Content","Delivery",...]
+ALTER TABLE events ADD COLUMN IF NOT EXISTS rules           TEXT;          -- shown to schools + judges
+ALTER TABLE events ADD COLUMN IF NOT EXISTS assigned_members JSONB;        -- club members assigned to the event
+
+-- ── MARKS: per-entry scoring + finalize flag ─────────────────
+ALTER TABLE marks ADD COLUMN IF NOT EXISTS entry_index INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE marks ADD COLUMN IF NOT EXISTS finalized   BOOLEAN NOT NULL DEFAULT false;
+-- marks are unique per (slot, event, entry) now, not just (slot, event)
+ALTER TABLE marks DROP CONSTRAINT IF EXISTS marks_slot_number_event_id_key;
+ALTER TABLE marks ADD  CONSTRAINT marks_slot_event_entry_key UNIQUE (slot_number, event_id, entry_index);
+
+-- ── RESULTS: full tie-aware winner groups ────────────────────
+ALTER TABLE results ADD COLUMN IF NOT EXISTS winners_json TEXT;            -- JSON array of {rank,total,entries[]}
+
+-- ── SETTINGS: configurable place points ──────────────────────
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS points_1st INTEGER NOT NULL DEFAULT 15;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS points_2nd INTEGER NOT NULL DEFAULT 10;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS points_3rd INTEGER NOT NULL DEFAULT 5;
+
+-- ── GUEST CREDENTIALS ────────────────────────────────────────
+-- Admin-managed logins handed to guest evaluators (judges).
+CREATE TABLE IF NOT EXISTS guest_credentials (
+  id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  login_id       TEXT NOT NULL UNIQUE,
+  email          TEXT NOT NULL,
+  password_plain TEXT NOT NULL,          -- shown to admin so they can share it
+  created_at     TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── GUEST MARKS ──────────────────────────────────────────────
+-- One judge's criteria scores for one participant entry, in one event.
+-- `locked` finalizes the entry so its marks can no longer be edited.
+CREATE TABLE IF NOT EXISTS guest_marks (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  event_id        UUID REFERENCES events(id) ON DELETE CASCADE,
+  judge_number    INTEGER NOT NULL,
+  judge_name      TEXT NOT NULL,
+  slot_number     INTEGER NOT NULL,
+  entry_index     INTEGER NOT NULL DEFAULT 1,
+  criteria_scores JSONB NOT NULL DEFAULT '[]',
+  judge_total     NUMERIC NOT NULL DEFAULT 0,
+  locked          BOOLEAN NOT NULL DEFAULT false,
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (event_id, judge_number, slot_number, entry_index)
+);
+
+-- ── ON-SPOT REGISTRATIONS ────────────────────────────────────
+-- Walk-in entries added by club members on the event day.
+CREATE TABLE IF NOT EXISTS onspot_registrations (
+  id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  slot_number      INTEGER NOT NULL,
+  event_id         UUID REFERENCES events(id) ON DELETE CASCADE,
+  participant_name TEXT NOT NULL,
+  amount_paid      BOOLEAN NOT NULL DEFAULT false,
+  created_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── RLS for the new tables ───────────────────────────────────
+ALTER TABLE guest_credentials    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE guest_marks          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE onspot_registrations ENABLE ROW LEVEL SECURITY;
+
+-- guest_credentials: admin manages; guests can read to log in
+CREATE POLICY "admin_guest_credentials" ON guest_credentials
+  FOR ALL USING (get_user_role() = 'final_year');
+CREATE POLICY "read_guest_credentials" ON guest_credentials
+  FOR SELECT USING (true);
+
+-- guest_marks: guests submit their own; admins manage; club/final read
+CREATE POLICY "guest_insert_marks" ON guest_marks
+  FOR INSERT WITH CHECK (get_user_role() = 'guest');
+CREATE POLICY "guest_update_own_marks" ON guest_marks
+  FOR UPDATE USING (get_user_role() = 'guest');
+CREATE POLICY "read_guest_marks" ON guest_marks
+  FOR SELECT USING (get_user_role() IN ('guest', 'club_member', 'final_year'));
+CREATE POLICY "admin_guest_marks" ON guest_marks
+  FOR ALL USING (get_user_role() = 'final_year');
+
+-- onspot_registrations: club members + final years manage
+CREATE POLICY "club_onspot" ON onspot_registrations
+  FOR ALL USING (get_user_role() IN ('club_member', 'final_year'));
