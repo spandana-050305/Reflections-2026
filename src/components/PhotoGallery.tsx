@@ -59,8 +59,8 @@ export default function PhotoGallery() {
 
       {/* Full-width last photo */}
       <div className="max-w-5xl mx-auto px-4 mt-3 cursor-pointer" onClick={() => open(photos[8].src)}>
-        <div className="relative rounded-2xl overflow-hidden shadow-md h-48 sm:h-64">
-          <Image src={photos[8].src} alt={photos[8].alt} fill className="object-cover object-center hover:scale-105 transition-transform duration-500" sizes="1000px" />
+        <div className="relative rounded-2xl overflow-hidden shadow-md h-56 sm:h-72">
+          <Image src={photos[8].src} alt={photos[8].alt} fill className="object-cover object-top hover:scale-105 transition-transform duration-500" sizes="1000px" />
         </div>
       </div>
 
