@@ -1,18 +1,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
+import PhotoGallery from '@/components/PhotoGallery'
 
-const photos = [
-  { src: '/photos/photo1.jpg', alt: 'Reflections team' },
-  { src: '/photos/photo2.jpg', alt: 'Reflections stage' },
-  { src: '/photos/photo3.jpg', alt: 'Reflections performance' },
-  { src: '/photos/photo4.jpg', alt: 'Reflections 23 stage' },
-  { src: '/photos/photo5.jpg', alt: 'Reflections highlights' },
-  { src: '/photos/photo6.jpg', alt: 'Reflections moments' },
-  { src: '/photos/photo7.jpeg', alt: 'Reflections event' },
-  { src: '/photos/photo8.jpeg', alt: 'Reflections participants' },
-  { src: '/photos/photo9.jpeg', alt: 'Reflections celebration' },
-]
 
 const stats = [
   { value: '10+', label: 'Years of Legacy' },
@@ -133,55 +123,7 @@ export default function LandingPage() {
           </p>
         </div>
 
-        {/* Bento grid */}
-        <div className="max-w-5xl mx-auto px-4 grid grid-cols-3 grid-rows-3 gap-3" style={{ gridTemplateRows: '200px 180px 180px' }}>
-
-          {/* photo1 — large feature, top-left */}
-          <div className="col-span-2 row-span-2 relative rounded-2xl overflow-hidden shadow-md">
-            <Image src="/photos/photo1.jpg" alt="Reflections team" fill className="object-cover hover:scale-105 transition-transform duration-500" sizes="600px" />
-          </div>
-
-          {/* photo2 — top-right */}
-          <div className="col-span-1 row-span-1 relative rounded-2xl overflow-hidden shadow-md">
-            <Image src="/photos/photo2.jpg" alt="Reflections stage" fill className="object-cover hover:scale-105 transition-transform duration-500" sizes="300px" />
-          </div>
-
-          {/* photo3 — mid-right */}
-          <div className="col-span-1 row-span-1 relative rounded-2xl overflow-hidden shadow-md">
-            <Image src="/photos/photo3.jpg" alt="Reflections performance" fill className="object-cover hover:scale-105 transition-transform duration-500" sizes="300px" />
-          </div>
-
-          {/* photo4 — bottom-left small */}
-          <div className="col-span-1 row-span-1 relative rounded-2xl overflow-hidden shadow-md">
-            <Image src="/photos/photo4.jpg" alt="Reflections 23 stage" fill className="object-cover hover:scale-105 transition-transform duration-500" sizes="250px" />
-          </div>
-
-          {/* photo5 — bottom-middle wide */}
-          <div className="col-span-2 row-span-1 relative rounded-2xl overflow-hidden shadow-md">
-            <Image src="/photos/photo5.jpg" alt="Reflections highlights" fill className="object-cover hover:scale-105 transition-transform duration-500" sizes="500px" />
-          </div>
-
-        </div>
-
-        {/* Second bento row */}
-        <div className="max-w-5xl mx-auto px-4 mt-3 grid grid-cols-3 gap-3" style={{ gridTemplateRows: '200px' }}>
-          <div className="col-span-1 relative rounded-2xl overflow-hidden shadow-md">
-            <Image src="/photos/photo6.jpg" alt="Reflections moments" fill className="object-cover hover:scale-105 transition-transform duration-500" sizes="300px" />
-          </div>
-          <div className="col-span-1 relative rounded-2xl overflow-hidden shadow-md">
-            <Image src="/photos/photo7.jpeg" alt="Reflections event" fill className="object-cover hover:scale-105 transition-transform duration-500" sizes="300px" />
-          </div>
-          <div className="col-span-1 relative rounded-2xl overflow-hidden shadow-md">
-            <Image src="/photos/photo8.jpeg" alt="Reflections participants" fill className="object-cover hover:scale-105 transition-transform duration-500" sizes="300px" />
-          </div>
-        </div>
-
-        {/* Full-width last photo */}
-        <div className="max-w-5xl mx-auto px-4 mt-3">
-          <div className="relative rounded-2xl overflow-hidden shadow-md h-48 sm:h-64">
-            <Image src="/photos/photo9.jpeg" alt="Reflections celebration" fill className="object-cover object-top hover:scale-105 transition-transform duration-500" sizes="1000px" />
-          </div>
-        </div>
+        <PhotoGallery />
       </div>
 
       {/* ── CTA ── */}
