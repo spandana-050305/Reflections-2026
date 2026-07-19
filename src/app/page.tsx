@@ -60,8 +60,8 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <h1 className="text-5xl sm:text-7xl font-bold tracking-tight text-gradient animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-          Reflections '26
+        <h1 className="text-5xl sm:text-7xl tracking-tight text-gradient animate-fade-in-up" style={{ fontFamily: 'var(--font-lilita)', animationDelay: '0.1s' }}>
+          Reflections
         </h1>
         <p className="text-base sm:text-lg font-medium text-slate-600 mt-3 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
           Rotaract Club of MCE, Hassan
@@ -85,8 +85,8 @@ export default function LandingPage() {
       <div className="max-w-3xl mx-auto px-6 py-10 text-center">
         <h2 className="text-2xl sm:text-3xl font-bold text-slate-800">Where Young Talent Takes Center Stage</h2>
         <p className="text-slate-500 mt-4 leading-relaxed text-sm sm:text-base">
-          Reflections is the flagship annual inter-school festival organized by the Rotaract Club of MCE, Hassan.
-          For over a decade, it has brought together students from schools across the region to compete, perform,
+          Reflections is the flagship annual inter-school event organized by the Rotaract Club of MCE, Hassan.
+          For over a decade, it has brought together students from schools across the Hassan to compete, perform,
           create, and grow through a diverse range of cultural, literary, artistic, and academic events.
         </p>
         <p className="text-slate-500 mt-3 leading-relaxed text-sm sm:text-base">
@@ -126,32 +126,60 @@ export default function LandingPage() {
 
       {/* ── Gallery ── */}
       <div className="py-10 bg-gray-50/60">
-        <div className="text-center mb-6 px-4">
+        <div className="text-center mb-8 px-4">
           <h2 className="text-2xl sm:text-3xl font-bold text-slate-800">Moments That Define Reflections</h2>
           <p className="text-slate-400 text-sm mt-2 max-w-xl mx-auto">
             A glimpse into the energy, excitement, creativity, and unforgettable memories created every year.
           </p>
         </div>
 
-        <div className="relative w-full overflow-hidden">
-          <div className="pointer-events-none absolute left-0 top-0 h-full w-16 sm:w-24 z-10 bg-gradient-to-r from-gray-50/60 to-transparent" />
-          <div className="pointer-events-none absolute right-0 top-0 h-full w-16 sm:w-24 z-10 bg-gradient-to-l from-gray-50/60 to-transparent" />
+        {/* Bento grid */}
+        <div className="max-w-5xl mx-auto px-4 grid grid-cols-3 grid-rows-3 gap-3" style={{ gridTemplateRows: '200px 180px 180px' }}>
 
-          <div className="flex gap-4 px-4 overflow-x-auto snap-x snap-mandatory pb-3" style={{ scrollbarWidth: 'none' }}>
-            {photos.map((p, i) => (
-              <div
-                key={i}
-                className="snap-center shrink-0 w-72 sm:w-80 h-52 sm:h-60 rounded-2xl overflow-hidden shadow-md ring-1 ring-gray-200 relative"
-              >
-                <Image
-                  src={p.src}
-                  alt={p.alt}
-                  fill
-                  className="object-cover hover:scale-105 transition-transform duration-500"
-                  sizes="320px"
-                />
-              </div>
-            ))}
+          {/* photo1 — large feature, top-left */}
+          <div className="col-span-2 row-span-2 relative rounded-2xl overflow-hidden shadow-md">
+            <Image src="/photos/photo1.jpg" alt="Reflections team" fill className="object-cover hover:scale-105 transition-transform duration-500" sizes="600px" />
+          </div>
+
+          {/* photo2 — top-right */}
+          <div className="col-span-1 row-span-1 relative rounded-2xl overflow-hidden shadow-md">
+            <Image src="/photos/photo2.jpg" alt="Reflections stage" fill className="object-cover hover:scale-105 transition-transform duration-500" sizes="300px" />
+          </div>
+
+          {/* photo3 — mid-right */}
+          <div className="col-span-1 row-span-1 relative rounded-2xl overflow-hidden shadow-md">
+            <Image src="/photos/photo3.jpg" alt="Reflections performance" fill className="object-cover hover:scale-105 transition-transform duration-500" sizes="300px" />
+          </div>
+
+          {/* photo4 — bottom-left small */}
+          <div className="col-span-1 row-span-1 relative rounded-2xl overflow-hidden shadow-md">
+            <Image src="/photos/photo4.jpg" alt="Reflections 23 stage" fill className="object-cover hover:scale-105 transition-transform duration-500" sizes="250px" />
+          </div>
+
+          {/* photo5 — bottom-middle wide */}
+          <div className="col-span-2 row-span-1 relative rounded-2xl overflow-hidden shadow-md">
+            <Image src="/photos/photo5.jpg" alt="Reflections highlights" fill className="object-cover hover:scale-105 transition-transform duration-500" sizes="500px" />
+          </div>
+
+        </div>
+
+        {/* Second bento row */}
+        <div className="max-w-5xl mx-auto px-4 mt-3 grid grid-cols-3 gap-3" style={{ gridTemplateRows: '200px' }}>
+          <div className="col-span-1 relative rounded-2xl overflow-hidden shadow-md">
+            <Image src="/photos/photo6.jpg" alt="Reflections moments" fill className="object-cover hover:scale-105 transition-transform duration-500" sizes="300px" />
+          </div>
+          <div className="col-span-1 relative rounded-2xl overflow-hidden shadow-md">
+            <Image src="/photos/photo7.jpeg" alt="Reflections event" fill className="object-cover hover:scale-105 transition-transform duration-500" sizes="300px" />
+          </div>
+          <div className="col-span-1 relative rounded-2xl overflow-hidden shadow-md">
+            <Image src="/photos/photo8.jpeg" alt="Reflections participants" fill className="object-cover hover:scale-105 transition-transform duration-500" sizes="300px" />
+          </div>
+        </div>
+
+        {/* Full-width last photo */}
+        <div className="max-w-5xl mx-auto px-4 mt-3">
+          <div className="relative rounded-2xl overflow-hidden shadow-md h-48 sm:h-64">
+            <Image src="/photos/photo9.jpeg" alt="Reflections celebration" fill className="object-cover object-top hover:scale-105 transition-transform duration-500" sizes="1000px" />
           </div>
         </div>
       </div>
