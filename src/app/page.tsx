@@ -43,30 +43,59 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white flex flex-col overflow-hidden">
 
-      {/* ── Hero ── */}
-      <div className="relative flex flex-col items-center justify-center pt-16 pb-12 px-4 text-center overflow-hidden">
+      {/* ── Hero — dark & glowing ── */}
+      <div className="relative flex flex-col items-center justify-center pt-16 pb-14 px-4 text-center overflow-hidden bg-[#08081a]">
+
+        {/* Glowing orbs */}
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -top-32 -right-32 h-[500px] w-[500px] rounded-full bg-brand-300/30 blur-3xl" />
-          <div className="absolute -bottom-32 -left-32 h-[500px] w-[500px] rounded-full bg-brand-200/40 blur-3xl" />
-          <div className="absolute top-1/2 left-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-100/30 blur-3xl" />
+          <div className="absolute -top-20 -right-20 h-[450px] w-[450px] rounded-full bg-brand-600/25 blur-[120px]" />
+          <div className="absolute -bottom-20 -left-20 h-[450px] w-[450px] rounded-full bg-brand-500/20 blur-[120px]" />
+          <div className="absolute top-1/2 left-1/2 h-80 w-80 -translate-x-1/2 -translate-y-1/2 rounded-full bg-purple-700/20 blur-[100px]" />
+          <div className="absolute top-20 left-1/4 h-40 w-40 rounded-full bg-pink-500/15 blur-[80px]" />
+          <div className="absolute bottom-10 right-1/4 h-40 w-40 rounded-full bg-brand-400/20 blur-[80px]" />
         </div>
-        <div className="pointer-events-none absolute inset-0 dot-grid opacity-30" />
+
+        {/* Star-like dots */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          {[
+            'top-[8%] left-[12%]', 'top-[15%] left-[78%]', 'top-[30%] left-[5%]',
+            'top-[25%] right-[8%]', 'top-[60%] left-[8%]', 'top-[55%] right-[6%]',
+            'top-[80%] left-[20%]', 'top-[75%] right-[18%]', 'top-[45%] left-[92%]',
+            'top-[10%] left-[45%]', 'top-[90%] left-[55%]', 'top-[35%] left-[60%]',
+          ].map((pos, i) => (
+            <div
+              key={i}
+              className={`absolute ${pos} h-0.5 w-0.5 rounded-full bg-white/40`}
+              style={{ boxShadow: '0 0 4px 1px rgba(255,255,255,0.3)', animationDelay: `${i * 0.3}s` }}
+            />
+          ))}
+        </div>
 
         {/* Logo */}
         <div className="relative mb-6 animate-fade-in-up">
-          <div className="absolute inset-0 rounded-3xl bg-brand-300/40 blur-xl animate-pulse-glow" />
-          <div className="relative flex items-center justify-center h-24 w-24 rounded-3xl bg-white shadow-glow ring-1 ring-brand-100">
+          <div className="absolute inset-0 rounded-3xl bg-brand-400/50 blur-xl animate-pulse-glow" />
+          <div className="relative flex items-center justify-center h-24 w-24 rounded-3xl bg-white/10 backdrop-blur-sm shadow-glow ring-1 ring-white/20">
             <Image src="/logo.png" alt="Rotaract Club MCE" width={64} height={64} className="object-contain" />
           </div>
         </div>
 
-        <h1 className="text-5xl sm:text-7xl font-bold tracking-tight text-gradient animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+        <h1
+          className="text-5xl sm:text-7xl font-bold tracking-tight animate-fade-in-up"
+          style={{
+            animationDelay: '0.1s',
+            background: 'linear-gradient(135deg, #ff6eb4 0%, #ff3d8f 40%, #c026d3 80%, #a855f7 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            filter: 'drop-shadow(0 0 30px rgba(236,72,153,0.5))',
+          }}
+        >
           Reflections '26
         </h1>
-        <p className="text-base sm:text-lg font-medium text-slate-600 mt-3 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+        <p className="text-base sm:text-lg font-medium text-white/80 mt-3 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
           Rotaract Club of MCE, Hassan
         </p>
-        <p className="text-sm sm:text-base text-slate-400 mt-1.5 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
+        <p className="text-sm sm:text-base text-white/50 mt-1.5 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
           Celebrating Talent. Inspiring Excellence. Building Memories.
         </p>
 
@@ -74,11 +103,24 @@ export default function LandingPage() {
         <div className="flex flex-wrap justify-center gap-6 sm:gap-10 mt-10 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
           {stats.map(s => (
             <div key={s.label} className="text-center">
-              <p className="text-2xl sm:text-3xl font-bold text-brand-600">{s.value}</p>
-              <p className="text-xs text-slate-400 mt-0.5 max-w-[80px]">{s.label}</p>
+              <p
+                className="text-2xl sm:text-3xl font-bold"
+                style={{
+                  background: 'linear-gradient(135deg, #f9a8d4, #ec4899)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}
+              >
+                {s.value}
+              </p>
+              <p className="text-xs text-white/40 mt-0.5 max-w-[80px]">{s.label}</p>
             </div>
           ))}
         </div>
+
+        {/* Bottom fade to white */}
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-b from-transparent to-white" />
       </div>
 
       {/* ── About ── */}
