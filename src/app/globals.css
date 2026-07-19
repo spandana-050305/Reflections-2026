@@ -10,6 +10,7 @@
   }
   body {
     @apply text-brand-900;
+    font-family: 'Times New Roman', Times, serif;
     background-color: #FFF6F9;
     background-image:
       radial-gradient(60rem 60rem at 110% -10%, rgb(255 10 108 / 0.07), transparent 60%),
