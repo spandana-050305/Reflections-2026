@@ -62,32 +62,23 @@ export default function AdminGuestMarksPage() {
 
   useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current) }, [])
 
-  async function load() {
+  // Load small/static tables: categories, events, results, settings
+  async function loadBase(): Promise<{ cats: Category[]; evs: Event[] } | null> {
     const [
       { data: cats, error: catsErr },
       { data: evs,  error: evsErr  },
-      { data: gm,   error: gmErr   },
-      { data: mm,   error: mmErr   },
-      { data: parts,error: partsErr},
       { data: resultData, error: resErr },
       { data: stg,  error: stgErr  },
     ] = await Promise.all([
       supabase.from('categories').select('*').order('display_order'),
       supabase.from('events').select('*').order('name'),
-      supabase.from('guest_marks').select('*'),
-      supabase.from('marks').select('*'),
-      supabase.from('participants').select('slot_number, event_id, entry_index, member_index, participant_name').order('entry_index').order('member_index'),
       supabase.from('results').select('*'),
       supabase.from('settings').select('*').single(),
     ])
-    const firstErr = catsErr ?? evsErr ?? gmErr ?? mmErr ?? partsErr ?? resErr ?? stgErr
-    if (firstErr) { flash(`❌ Failed to load: ${firstErr.message}`); return }
+    const firstErr = catsErr ?? evsErr ?? resErr ?? stgErr
+    if (firstErr) { flash(`❌ Failed to load: ${firstErr.message}`); return null }
     setCategories(cats ?? [])
     setEvents((evs as Event[]) ?? [])
-    if (cats?.[0]) setSelectedCat(prev => prev || cats[0].id)
-    setGuestMarks(gm ?? [])
-    setManualMarks(mm ?? [])
-    setParticipants(parts ?? [])
     const res: Record<string, any> = {}
     ;(resultData ?? []).forEach((r: any) => { res[r.event_id] = r })
     setResults(res)
@@ -95,9 +86,58 @@ export default function AdminGuestMarksPage() {
       setDraftPts({ p1: stg.points_1st ?? 15, p2: stg.points_2nd ?? 10, p3: stg.points_3rd ?? 5 })
       setUnlockPassword(stg.unlock_password ?? '')
     }
+    return { cats: cats ?? [], evs: (evs as Event[]) ?? [] }
   }
 
-  useEffect(() => { load() }, [])
+  // Load marks only for events in the selected category — much faster than fetching all rows
+  async function loadCategory(catId: string, evList?: Event[]) {
+    const allEvents = evList ?? events
+    const catEventIds = allEvents.filter(e => e.category_id === catId).map(e => e.id)
+    if (catEventIds.length === 0) {
+      setGuestMarks([]); setManualMarks([]); setParticipants([])
+      return
+    }
+    const [
+      { data: gm,   error: gmErr   },
+      { data: mm,   error: mmErr   },
+      { data: parts,error: partsErr},
+    ] = await Promise.all([
+      supabase.from('guest_marks').select('*').in('event_id', catEventIds),
+      supabase.from('marks').select('*').in('event_id', catEventIds),
+      supabase.from('participants')
+        .select('slot_number, event_id, entry_index, member_index, participant_name')
+        .in('event_id', catEventIds)
+        .order('entry_index').order('member_index'),
+    ])
+    const firstErr = gmErr ?? mmErr ?? partsErr
+    if (firstErr) { flash(`❌ Failed to load marks: ${firstErr.message}`); return }
+    setGuestMarks(gm ?? [])
+    setManualMarks(mm ?? [])
+    setParticipants(parts ?? [])
+  }
+
+  // After mutations: reload results + current category marks (no need to re-fetch cats/events)
+  async function reload() {
+    const { data: resultData } = await supabase.from('results').select('*')
+    const res: Record<string, any> = {}
+    ;(resultData ?? []).forEach((r: any) => { res[r.event_id] = r })
+    setResults(res)
+    await loadCategory(selectedCat)
+  }
+
+  useEffect(() => {
+    async function init() {
+      const base = await loadBase()
+      if (!base) return
+      const { cats, evs } = base
+      const firstCat = cats[0]?.id
+      if (firstCat) {
+        setSelectedCat(firstCat)
+        await loadCategory(firstCat, evs)
+      }
+    }
+    init()
+  }, [])
 
   async function savePoints() {
     setSavingPts(true)
@@ -189,7 +229,7 @@ export default function AdminGuestMarksPage() {
     setSaving(true)
     const err = await setEntryLock(eventId, slot, entry, true)
     if (err) { flash(`❌ ${err}`); setSaving(false); return }
-    await load()
+    await reload()
     flash(`Slot ${slot} locked ✓`)
     setSaving(false)
   }
@@ -198,7 +238,7 @@ export default function AdminGuestMarksPage() {
     setSaving(true)
     const err = await setEntryLock(eventId, slot, entry, false)
     if (err) { flash(`❌ ${err}`); setSaving(false); return }
-    await load()
+    await reload()
     flash(`Slot ${slot} unlocked ✓`)
     setSaving(false)
   }
@@ -209,7 +249,7 @@ export default function AdminGuestMarksPage() {
       const err = await setEntryLock(eventId, slot, entry, true)
       if (err) { flash(`❌ ${err}`); setSaving(false); return }
     }
-    await load()
+    await reload()
     flash('All marks locked ✓')
     setSaving(false)
     setLockAllTarget(null)
@@ -223,7 +263,7 @@ export default function AdminGuestMarksPage() {
     }
     const { error: delErr } = await supabase.from('results').delete().eq('event_id', eventId)
     if (delErr) { flash(`❌ ${delErr.message}`); setSaving(false); return }
-    await load()
+    await reload()
     flash('Fully unlocked ✓')
     setSaving(false)
     setFullUnlockTarget(null)
@@ -266,7 +306,7 @@ export default function AdminGuestMarksPage() {
     }, { onConflict: 'event_id,judge_number,slot_number,entry_index' })
     setEditSaving(false)
     if (error) { flash(`❌ ${error.message}`); return }
-    await load()
+    await reload()
     flash('Marks updated ✓')
     setEditModal(null)
   }
@@ -318,7 +358,7 @@ export default function AdminGuestMarksPage() {
     }, { onConflict: 'event_id' })
     setSaving(false)
     if (upsertErr) { flash(`❌ ${upsertErr.message}`); return }
-    await load()
+    await reload()
     flash('Winners computed from guest marks ✓')
     setComputeTarget(null)
   }
@@ -359,7 +399,7 @@ export default function AdminGuestMarksPage() {
 
       <div className="flex gap-2 flex-wrap">
         {categories.map(c => (
-          <button key={c.id} onClick={() => setSelectedCat(c.id)}
+          <button key={c.id} onClick={() => { setSelectedCat(c.id); loadCategory(c.id) }}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${selectedCat===c.id ? 'bg-brand-600 text-white shadow-glow' : 'bg-white border border-gray-200 text-gray-600 hover:border-brand-300'}`}>
             {c.name}
           </button>

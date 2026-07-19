@@ -11,7 +11,8 @@ export default function AdminManualMarksPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [schools, setSchools] = useState<any[]>([])
-  const [marks, setMarks] = useState<any[]>([])
+  const [marksIndex, setMarksIndex] = useState<Set<string>>(new Set()) // event IDs that have marks
+  const [eventMarks, setEventMarks] = useState<any[]>([]) // full marks for selected event only
 
   const [selectedCat, setSelectedCat] = useState('')
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
@@ -40,33 +41,44 @@ export default function AdminManualMarksPage() {
       supabase.from('categories').select('*').order('display_order'),
       supabase.from('events').select('*').order('name'),
       supabase.from('schools').select('slot_number, school_name').order('slot_number'),
-      supabase.from('marks').select('*'),
+      supabase.from('marks').select('event_id'),  // lightweight: just IDs for dot indicator
     ])
     const firstErr = catsErr ?? evsErr ?? scErr ?? mkErr
     if (firstErr) { showFlash(`❌ Failed to load: ${firstErr.message}`); return }
     setCategories(cats ?? [])
     setEvents((evs as Event[]) ?? [])
     setSchools(sc ?? [])
-    setMarks(mk ?? [])
+    setMarksIndex(new Set((mk ?? []).map((m: any) => m.event_id)))
     if (cats?.[0]) setSelectedCat(prev => prev || cats[0].id)
   }
 
   useEffect(() => { load() }, [])
 
-  // When event changes, build draft from existing marks
+  // When event changes, fetch marks for that event only
+  useEffect(() => {
+    if (!selectedEvent) { setEventMarks([]); return }
+    async function fetchMarks() {
+      const { data: mk, error: mkErr } = await supabase
+        .from('marks').select('*').eq('event_id', selectedEvent!.id)
+      if (mkErr) { showFlash(`❌ Failed to load marks: ${mkErr.message}`); return }
+      setEventMarks(mk ?? [])
+    }
+    fetchMarks()
+  }, [selectedEvent?.id])
+
+  // Rebuild draft whenever eventMarks or selectedEvent changes
   useEffect(() => {
     if (!selectedEvent) { setDraft({}); return }
-    const eventMarks = marks.filter(m => m.event_id === selectedEvent.id)
     const d: Record<number, Record<number, string>> = {}
     schools.forEach(s => {
       d[s.slot_number] = {}
       for (let e = 1; e <= (selectedEvent.max_entries ?? 1); e++) {
-        const row = eventMarks.find(m => m.slot_number === s.slot_number && m.entry_index === e)
+        const row = eventMarks.find((m: any) => m.slot_number === s.slot_number && m.entry_index === e)
         d[s.slot_number][e] = row ? String(row.total) : ''
       }
     })
     setDraft(d)
-  }, [selectedEvent, marks, schools])
+  }, [selectedEvent, eventMarks, schools])
 
   async function handleSave() {
     if (!selectedEvent) return
@@ -104,7 +116,9 @@ export default function AdminManualMarksPage() {
       showFlash('Error saving: ' + error.message)
     } else {
       showFlash('Marks saved ✓')
-      await load()
+      const { data: freshMk } = await supabase.from('marks').select('*').eq('event_id', selectedEvent!.id)
+      setEventMarks(freshMk ?? [])
+      setMarksIndex(prev => new Set([...prev, selectedEvent!.id]))
     }
     setSaving(false)
   }
@@ -115,7 +129,8 @@ export default function AdminManualMarksPage() {
     const { error } = await supabase.from('marks').delete().eq('event_id', selectedEvent.id)
     if (error) { showFlash(`❌ ${error.message}`); return }
     showFlash('Marks cleared.')
-    await load()
+    setEventMarks([])
+    setMarksIndex(prev => { const s = new Set(prev); s.delete(selectedEvent!.id); return s })
   }
 
   const filteredEvents = events.filter(e => e.category_id === selectedCat)
@@ -153,7 +168,7 @@ export default function AdminManualMarksPage() {
       {/* Event list */}
       <div className="flex gap-2 flex-wrap">
         {filteredEvents.map(ev => {
-          const hasMarks = marks.some(m => m.event_id === ev.id)
+          const hasMarks = marksIndex.has(ev.id)
           return (
             <button key={ev.id}
               onClick={() => setSelectedEvent(ev)}
