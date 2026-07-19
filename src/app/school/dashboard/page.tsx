@@ -9,10 +9,10 @@ export default async function SchoolDashboard() {
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
   const user = session?.user
-  if (!user) redirect('/')
+  if (!user) redirect('/login')
 
   const slotNumber = user.user_metadata?.slot_number as number | undefined
-  if (!slotNumber) redirect('/')
+  if (!slotNumber) redirect('/login')
 
   const [
     { data: announcements },

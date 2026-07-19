@@ -11,8 +11,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
   const user = session?.user
-  if (!user) redirect('/')
-  if (user.user_metadata?.role !== 'final_year') redirect('/')
+  if (!user) redirect('/login')
+  if (user.user_metadata?.role !== 'final_year') redirect('/login')
 
   // Self-registered Final Years need approval before getting full access.
   // Seeded / admin-created accounts have no club_accounts row → allowed through.

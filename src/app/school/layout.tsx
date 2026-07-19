@@ -8,8 +8,8 @@ export default async function SchoolLayout({ children }: { children: React.React
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
   const user = session?.user
-  if (!user) redirect('/')
-  if (user.user_metadata?.role !== 'school') redirect('/')
+  if (!user) redirect('/login')
+  if (user.user_metadata?.role !== 'school') redirect('/login')
 
   const slotNumber = user.user_metadata?.slot_number as number | undefined
 

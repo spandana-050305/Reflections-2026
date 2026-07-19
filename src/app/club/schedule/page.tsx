@@ -5,7 +5,7 @@ import { Calendar, MapPin, User } from 'lucide-react'
 export default async function ClubSchedulePage() {
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
-  if (!session?.user) redirect('/')
+  if (!session?.user) redirect('/login')
 
   const { data: events } = await supabase
     .from('events')
