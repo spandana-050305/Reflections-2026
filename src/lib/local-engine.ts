@@ -28,7 +28,7 @@ export interface LocalStore {
   guest_credentials: any[]
   guest_marks: any[]
   club_accounts: any[]
-  settings: { id: number; registration_open: boolean; points_1st?: number; points_2nd?: number; points_3rd?: number }
+  settings: { id: number; registration_open: boolean; points_1st?: number; points_2nd?: number; points_3rd?: number; unlock_password?: string | null; security_answer_1?: string | null; security_answer_2?: string | null }
   users: StoreUser[]
 }
 

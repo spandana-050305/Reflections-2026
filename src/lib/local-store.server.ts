@@ -66,10 +66,19 @@ function readStore(): LocalStore {
       store.settings.points_3rd = 5
       dirty = true
     }
-    // Default criteria_count for events created before this field existed.
+    // Default criteria_count / criteria_names / rules for events created before these fields existed.
     store.events.forEach((ev: any) => {
       if (ev.criteria_count == null) { ev.criteria_count = 4; dirty = true }
+      if (!('criteria_names' in ev)) { ev.criteria_names = null; dirty = true }
+      if (!('rules' in ev)) { ev.rules = null; dirty = true }
     })
+    // Default unlock_password fields for settings created before these fields existed.
+    if (!('unlock_password' in store.settings)) {
+      store.settings.unlock_password = null
+      store.settings.security_answer_1 = null
+      store.settings.security_answer_2 = null
+      dirty = true
+    }
     // Drop stale accounts from the old fixed judge1-4 system (superseded by
     // admin-generated guest credentials) so they no longer appear or log in.
     const beforeCount = store.users.length

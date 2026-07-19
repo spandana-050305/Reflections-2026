@@ -12,23 +12,23 @@ module.exports = {
       },
       colors: {
         brand: {
-          50:  '#fdf2f8',
-          100: '#fce7f3',
-          200: '#fbcfe8',
-          300: '#f9a8d4',
-          400: '#f472b6',
-          500: '#ec4899',
-          600: '#db2777',
-          700: '#be185d',
-          800: '#9d174d',
-          900: '#831843',
+          50:  '#FFF6F9', // Very Light Pink  — background
+          100: '#FFF0F5', // Pale Rose        — alternate background
+          200: '#FFD6E4', // Soft Pink        — card highlight
+          300: '#FFB3CB', // Blush Pink       — light accent / focus rings
+          400: '#FF5C97', // Rose Pink        — secondary interactive
+          500: '#FF0A6C', // Rotaract Pink    — primary
+          600: '#E60063', // Dark Pink        — primary hover
+          700: '#C70057', // Deep Magenta     — primary active
+          800: '#7A5164', // Dusty Rose       — secondary text
+          900: '#4B1E33', // Dark Plum        — primary text
         },
       },
       boxShadow: {
-        card: '0 1px 2px 0 rgb(16 24 40 / 0.04), 0 1px 3px 0 rgb(16 24 40 / 0.06)',
-        'card-hover': '0 12px 32px -8px rgb(219 39 119 / 0.18), 0 4px 12px -4px rgb(16 24 40 / 0.08)',
-        glow: '0 10px 30px -10px rgb(219 39 119 / 0.40)',
-        'glow-lg': '0 20px 50px -12px rgb(219 39 119 / 0.45)',
+        card: '0 1px 2px 0 rgb(75 30 51 / 0.04), 0 1px 3px 0 rgb(75 30 51 / 0.06)',
+        'card-hover': '0 12px 32px -8px rgb(255 10 108 / 0.20), 0 4px 12px -4px rgb(75 30 51 / 0.08)',
+        glow: '0 10px 30px -10px rgb(255 10 108 / 0.42)',
+        'glow-lg': '0 20px 50px -12px rgb(255 10 108 / 0.48)',
         'inner-glow': 'inset 0 1px 0 0 rgb(255 255 255 / 0.6)',
       },
       borderRadius: {

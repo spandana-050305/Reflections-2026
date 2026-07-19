@@ -6,8 +6,8 @@ import type { Announcement, School } from '@/lib/types'
 
 export default async function AdminDashboard() {
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/')
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) redirect('/')
 
   const [
     { data: schools },

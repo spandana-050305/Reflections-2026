@@ -85,6 +85,7 @@ export interface Result {
   first_slot: number | null
   second_slot: number | null
   third_slot: number | null
+  winners_json?: string | null
   published: boolean
   created_at: string
   updated_at: string
@@ -156,6 +157,7 @@ export interface GuestMark {
   entry_index: number
   criteria_scores: number[]
   judge_total: number
+  locked?: boolean
   created_at: string
   updated_at: string
 }

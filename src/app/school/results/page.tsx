@@ -26,10 +26,11 @@ function parseWinners(r: any): WinnerGroup[] {
 
 export default async function SchoolResultsPage() {
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user
   if (!user) redirect('/')
 
-  const slotNumber = user.user_metadata?.slot_number as number
+  const slotNumber = (user.user_metadata?.slot_number as number | undefined) ?? 0
 
   const { data: results } = await supabase
     .from('results')
@@ -37,13 +38,18 @@ export default async function SchoolResultsPage() {
     .eq('published', true)
     .order('created_at', { ascending: false })
 
-  // Group published results by category
+  // Group published results by category, preserving display_order
+  const catOrder: Record<string, number> = {}
   const byCat: Record<string, any[]> = {}
   ;(results ?? []).forEach((r: any) => {
     const catName = r.events?.categories?.name ?? 'Other'
-    if (!byCat[catName]) byCat[catName] = []
+    if (!byCat[catName]) {
+      byCat[catName] = []
+      catOrder[catName] = r.events?.categories?.display_order ?? 999
+    }
     byCat[catName].push(r)
   })
+  const sortedCats = Object.keys(byCat).sort((a, b) => (catOrder[a] ?? 999) - (catOrder[b] ?? 999))
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -58,7 +64,7 @@ export default async function SchoolResultsPage() {
         </div>
       )}
 
-      {Object.entries(byCat).map(([catName, catResults]) => (
+      {sortedCats.map(catName => { const catResults = byCat[catName]; return (
         <div key={catName} className="card">
           <h3 className="text-lg font-semibold text-brand-700 mb-4 pb-2 border-b border-gray-100">
             {catName}
@@ -110,7 +116,7 @@ export default async function SchoolResultsPage() {
             })}
           </div>
         </div>
-      ))}
+      )})}
     </div>
   )
 }

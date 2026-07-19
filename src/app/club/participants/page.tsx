@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Pencil, Trash2, Check, X, ClipboardList, Users, CheckCircle2, XCircle, FileDown } from 'lucide-react'
 import jsPDF from 'jspdf'
@@ -22,6 +22,7 @@ export default function ClubParticipantsPage() {
   const [selectedCat, setSelectedCat] = useState('')
   const [selectedEvent, setSelectedEvent] = useState('')
   const [message, setMessage] = useState('')
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Participants tab ─────────────────────────────────────────────────────
   const [participants, setParticipants] = useState<any[]>([])
@@ -42,18 +43,28 @@ export default function ClubParticipantsPage() {
   const [showEventPicker, setShowEventPicker] = useState(false)
 
   function flash(msg: string) {
+    if (flashTimer.current) clearTimeout(flashTimer.current)
     setMessage(msg)
-    setTimeout(() => setMessage(''), 3500)
+    flashTimer.current = setTimeout(() => setMessage(''), 3500)
   }
+
+  // Clean up flash timer on unmount
+  useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current) }, [])
 
   // ── Load base data ────────────────────────────────────────────────────────
   useEffect(() => {
     async function loadBase() {
-      const [{ data: cats }, { data: evs }, { data: sc }] = await Promise.all([
+      const [
+        { data: cats, error: catsErr },
+        { data: evs,  error: evsErr  },
+        { data: sc,   error: scErr   },
+      ] = await Promise.all([
         supabase.from('categories').select('*').order('display_order'),
         supabase.from('events').select('*').order('name'),
         supabase.from('schools').select('slot_number, school_name').order('slot_number'),
       ])
+      const firstErr = catsErr ?? evsErr ?? scErr
+      if (firstErr) { flash(`❌ Failed to load data: ${firstErr.message}`); return }
       setCategories(cats ?? [])
       setEvents(evs ?? [])
       setSchools(sc ?? [])
@@ -64,6 +75,7 @@ export default function ClubParticipantsPage() {
   }, [])
 
   useEffect(() => {
+    setEditingId(null)
     if (selectedEvent) loadParticipants(selectedEvent)
     else setParticipants([])
   }, [selectedEvent])
@@ -80,10 +92,11 @@ export default function ClubParticipantsPage() {
 
   // ── Participants ─────────────────────────────────────────────────────────
   async function loadParticipants(eventId: string) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('participants').select('*')
       .eq('event_id', eventId)
       .order('slot_number').order('entry_index').order('member_index')
+    if (error) { flash(`❌ Failed to load participants: ${error.message}`); return }
     setParticipants(data ?? [])
   }
 
@@ -92,10 +105,11 @@ export default function ClubParticipantsPage() {
     if (!ev) return
     let pts = participants
     if (eventId !== selectedEvent) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('participants').select('*')
         .eq('event_id', eventId)
         .order('slot_number').order('entry_index').order('member_index')
+      if (error) { flash(`❌ Export failed: ${error.message}`); return }
       pts = data ?? []
     }
     buildAndPrintPDF(ev, pts)
@@ -111,7 +125,7 @@ export default function ClubParticipantsPage() {
     const tableRows: string[][] = []
     slots.forEach(slot => {
       const schoolName = schoolMap[slot] ?? '—'
-      const entries = [...new Set(pts.filter((p: any) => p.slot_number === slot).map((p: any) => p.entry_index))].sort()
+      const entries = [...new Set(pts.filter((p: any) => p.slot_number === slot).map((p: any) => p.entry_index))].sort((a: number, b: number) => a - b)
       entries.forEach(entry => {
         const members = pts
           .filter((p: any) => p.slot_number === slot && p.entry_index === entry)
@@ -149,10 +163,11 @@ export default function ClubParticipantsPage() {
     if (!ev) return
     let pts = participants
     if (eventId !== selectedEvent) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('participants').select('*')
         .eq('event_id', eventId)
         .order('slot_number').order('entry_index').order('member_index')
+      if (error) { flash(`❌ Export failed: ${error.message}`); return }
       pts = data ?? []
     }
     buildAndDownloadExcel(ev, pts)
@@ -166,7 +181,7 @@ export default function ClubParticipantsPage() {
     const rows: any[] = []
     slots.forEach(slot => {
       const schoolName = schoolMap[slot] ?? '—'
-      const entries = [...new Set(pts.filter((p: any) => p.slot_number === slot).map((p: any) => p.entry_index))].sort()
+      const entries = [...new Set(pts.filter((p: any) => p.slot_number === slot).map((p: any) => p.entry_index))].sort((a: number, b: number) => a - b)
       entries.forEach(entry => {
         const members = pts
           .filter((p: any) => p.slot_number === slot && p.entry_index === entry)
@@ -190,18 +205,21 @@ export default function ClubParticipantsPage() {
   }
 
   async function loadOnspots() {
-    const { data } = await supabase.from('onspot_registrations').select('*').order('created_at', { ascending: false })
+    const { data, error } = await supabase.from('onspot_registrations').select('*').order('created_at', { ascending: false })
+    if (error) { flash(`❌ Failed to load on-spot registrations: ${error.message}`); return }
     setOnspots(data ?? [])
   }
 
   async function addOnspot() {
+    if (onspotSaving) return
     const slotNum = parseInt(onspotForm.slot_number)
     const evId = onspotForm.event_id
     if (!slotNum || !evId || !onspotForm.participant_name.trim()) { flash('❌ Please fill all fields.'); return }
     const ev = events.find(e => e.id === evId)
     if (!ev) { flash('❌ Event not found.'); return }
 
-    const { data: existing } = await supabase.from('participants').select('entry_index').eq('slot_number', slotNum).eq('event_id', evId)
+    const { data: existing, error: existErr } = await supabase.from('participants').select('entry_index').eq('slot_number', slotNum).eq('event_id', evId)
+    if (existErr) { flash(`❌ Could not verify entry count: ${existErr.message}`); return }
     const distinctEntries = new Set((existing ?? []).map((r: any) => r.entry_index)).size
     if (distinctEntries >= (ev.max_entries ?? 1)) {
       const schoolName = schools.find(s => s.slot_number === slotNum)?.school_name ?? `Slot ${slotNum}`
@@ -211,18 +229,28 @@ export default function ClubParticipantsPage() {
 
     const nextEntry = distinctEntries + 1
     setOnspotSaving(true)
-    await supabase.from('onspot_registrations').insert({
+    const { data: insertedOnspot, error: onspotErr } = await supabase.from('onspot_registrations').insert({
       slot_number: slotNum, event_id: evId,
       participant_name: onspotForm.participant_name.trim(),
       amount_paid: onspotForm.amount_paid,
       created_at: new Date().toISOString(),
-    })
-    await supabase.from('participants').insert({
+    }).select('id').single()
+    if (onspotErr) { flash(`❌ ${onspotErr.message}`); setOnspotSaving(false); return }
+
+    const { error: partErr } = await supabase.from('participants').insert({
       slot_number: slotNum, event_id: evId,
       participant_name: onspotForm.participant_name.trim(),
       entry_index: nextEntry, member_index: 1,
       created_at: new Date().toISOString(),
     })
+    if (partErr) {
+      // Roll back by ID — safe even if another record shares the same name/slot/event
+      await supabase.from('onspot_registrations').delete().eq('id', insertedOnspot.id)
+      flash(`❌ ${partErr.message}`)
+      setOnspotSaving(false)
+      return
+    }
+
     setOnspotForm({ slot_number: '', participant_name: '', event_id: '', amount_paid: false })
     setEventSearch('')
     await loadOnspots()
@@ -232,13 +260,24 @@ export default function ClubParticipantsPage() {
   }
 
   async function toggleAmountPaid(id: string, current: boolean) {
-    await supabase.from('onspot_registrations').update({ amount_paid: !current }).eq('id', id)
+    const { error } = await supabase.from('onspot_registrations').update({ amount_paid: !current }).eq('id', id)
+    if (error) { flash(`❌ ${error.message}`); return }
     loadOnspots()
   }
 
-  async function deleteOnspot(id: string) {
-    await supabase.from('onspot_registrations').delete().eq('id', id)
+  async function deleteOnspot(o: { id: string; slot_number: number; event_id: string; participant_name: string }) {
+    const { error: delOnspotErr } = await supabase.from('onspot_registrations').delete().eq('id', o.id)
+    if (delOnspotErr) { flash(`❌ ${delOnspotErr.message}`); return }
+    // Also remove the participant row that was created alongside this on-spot registration
+    const { error: delPartErr } = await supabase.from('participants')
+      .delete()
+      .eq('slot_number', o.slot_number)
+      .eq('event_id', o.event_id)
+      .eq('participant_name', o.participant_name)
+      .eq('member_index', 1)
+    if (delPartErr) { flash(`❌ ${delPartErr.message}`); return }
     loadOnspots()
+    if (selectedEvent === o.event_id) loadParticipants(selectedEvent)
   }
 
   const schoolMap: Record<number, string> = {}
@@ -329,7 +368,7 @@ export default function ClubParticipantsPage() {
                           {editingId === p.id ? (
                             <div className="flex items-center gap-2 flex-1">
                               <input value={editName} onChange={e => setEditName(e.target.value)} className="input flex-1" autoFocus />
-                              <button onClick={async () => { await supabase.from('participants').update({ participant_name: editName }).eq('id', p.id); setEditingId(null); loadParticipants(selectedEvent) }} className="btn-primary px-2 py-1"><Check size={14} /></button>
+                              <button onClick={async () => { const trimmed = editName.trim(); if (!trimmed) { flash('❌ Name cannot be empty.'); return } const { error } = await supabase.from('participants').update({ participant_name: trimmed }).eq('id', p.id); if (error) { flash(`❌ ${error.message}`); return } setEditingId(null); loadParticipants(selectedEvent) }} className="btn-primary px-2 py-1"><Check size={14} /></button>
                               <button onClick={() => setEditingId(null)} className="btn-secondary px-2 py-1"><X size={14} /></button>
                             </div>
                           ) : (
@@ -337,7 +376,7 @@ export default function ClubParticipantsPage() {
                               <span className="text-sm text-gray-800">{ev?.is_team_event ? `Member ${p.member_index}: ` : ''}{p.participant_name}</span>
                               <div className="flex gap-2">
                                 <button onClick={() => { setEditingId(p.id); setEditName(p.participant_name) }} className="text-gray-400 hover:text-brand-600"><Pencil size={14} /></button>
-                                <button onClick={async () => { await supabase.from('participants').delete().eq('id', p.id); loadParticipants(selectedEvent) }} className="text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
+                                <button onClick={async () => { const { error } = await supabase.from('participants').delete().eq('id', p.id); if (error) { flash(`❌ ${error.message}`); return } loadParticipants(selectedEvent) }} className="text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
                               </div>
                             </>
                           )}
@@ -429,7 +468,7 @@ export default function ClubParticipantsPage() {
                 <div>
                   <p className="font-medium text-gray-800">{o.participant_name}</p>
                   <p className="text-xs text-gray-400">
-                    Slot {o.slot_number} — {schoolMap[o.slot_number] ?? '—'} · {events.find(e => e.id === o.event_id)?.name ?? o.event_id}
+                    Slot {o.slot_number} — {schoolMap[o.slot_number] ?? '—'} · {events.find(e => e.id === o.event_id)?.name ?? 'Unknown event'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -437,7 +476,7 @@ export default function ClubParticipantsPage() {
                     className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full border ${o.amount_paid ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
                     {o.amount_paid ? <><CheckCircle2 size={12} />Paid</> : <><XCircle size={12} />Pending</>}
                   </button>
-                  <button onClick={() => deleteOnspot(o.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={15} /></button>
+                  <button onClick={() => deleteOnspot(o)} className="text-gray-400 hover:text-red-500"><Trash2 size={15} /></button>
                 </div>
               </div>
             ))}

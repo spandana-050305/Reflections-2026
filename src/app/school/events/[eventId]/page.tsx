@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { FileText, ArrowLeft, Save } from 'lucide-react'
@@ -12,30 +12,41 @@ interface Entry {
 }
 
 export default function EventDetailPage() {
-  const { eventId } = useParams()
+  const params = useParams()
+  const eventId = Array.isArray(params.eventId) ? params.eventId[0] : params.eventId as string
   const router = useRouter()
   const supabase = createClient()
 
   const [event, setEvent] = useState<Event | null>(null)
   const [slotNumber, setSlotNumber] = useState<number>(0)
-  const [isOpen, setIsOpen] = useState(true)
+  const [isOpen, setIsOpen] = useState(false)
   const [entries, setEntries] = useState<Entry[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => { if (msgTimer.current) clearTimeout(msgTimer.current) }, [])
+
+  function showMessage(msg: string) {
+    if (msgTimer.current) clearTimeout(msgTimer.current)
+    setMessage(msg)
+    msgTimer.current = setTimeout(() => setMessage(''), 3000)
+  }
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/'); return }
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) { router.push('/'); return }
 
-      const slot = user.user_metadata?.slot_number as number
+      const slot = session.user.user_metadata?.slot_number as number
+      if (!slot) { router.push('/'); return }   // guard: no slot assigned yet
       setSlotNumber(slot)
 
       const [
-        { data: ev },
-        { data: participants },
-        { data: settings },
+        { data: ev, error: evErr },
+        { data: participants, error: partErr },
+        { data: settings, error: settErr },
       ] = await Promise.all([
         supabase.from('events').select('*').eq('id', eventId).single(),
         supabase.from('participants')
@@ -47,8 +58,15 @@ export default function EventDetailPage() {
         supabase.from('settings').select('registration_open').single(),
       ])
 
+      const loadErr = evErr ?? partErr ?? settErr
+      if (loadErr) {
+        setMessage(`❌ Failed to load event: ${loadErr.message}`)
+        setLoading(false)
+        return
+      }
+
       setEvent(ev)
-      setIsOpen(settings?.registration_open ?? true)
+      setIsOpen(settings?.registration_open ?? false)
 
       if (ev) {
         const memberCount = ev.is_team_event ? (ev.team_size ?? 1) : 1
@@ -73,15 +91,21 @@ export default function EventDetailPage() {
   }, [eventId])
 
   async function handleSave() {
-    if (!event) return
+    if (!event || !slotNumber || !isOpen) return
     setSaving(true)
     setMessage('')
 
     // Delete existing, then insert fresh
-    await supabase.from('participants')
+    const { error: deleteError } = await supabase.from('participants')
       .delete()
       .eq('event_id', eventId)
       .eq('slot_number', slotNumber)
+
+    if (deleteError) {
+      showMessage(`❌ Error clearing old entries: ${deleteError.message}`)
+      setSaving(false)
+      return
+    }
 
     const rows = []
     for (let eIdx = 0; eIdx < entries.length; eIdx++) {
@@ -102,16 +126,15 @@ export default function EventDetailPage() {
     if (rows.length > 0) {
       const { error } = await supabase.from('participants').insert(rows)
       if (error) {
-        setMessage(`Error: ${error.message}`)
+        showMessage(`❌ Error: ${error.message}`)
         console.error('[Save] insert error:', error)
         setSaving(false)
         return
       }
     }
 
-    setMessage('Saved successfully!')
+    showMessage('Saved successfully!')
     setSaving(false)
-    setTimeout(() => setMessage(''), 3000)
     router.refresh()  // invalidate server-component cache so events list shows correct Filled/Pending status
   }
 
@@ -198,9 +221,12 @@ export default function EventDetailPage() {
                   value={name}
                   onChange={e => {
                     if (!isOpen) return
-                    const updated = [...entries]
-                    updated[eIdx].members[mIdx] = e.target.value
-                    setEntries(updated)
+                    const val = e.target.value
+                    setEntries(prev => prev.map((en, ei) =>
+                      ei === eIdx
+                        ? { ...en, members: en.members.map((m, mi) => mi === mIdx ? val : m) }
+                        : en
+                    ))
                   }}
                   className="input"
                   placeholder={event.is_team_event ? `Team member ${mIdx + 1} name` : 'Participant full name'}
@@ -219,7 +245,7 @@ export default function EventDetailPage() {
               {saving ? 'Saving…' : 'Save Entries'}
             </button>
             {message && (
-              <span className={`text-sm font-medium ${message.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>
+              <span className={`text-sm font-medium ${message.startsWith('❌') ? 'text-red-600' : 'text-green-600'}`}>
                 {message}
               </span>
             )}

@@ -165,11 +165,9 @@ CREATE POLICY "school_own_participants" ON participants
     AND slot_number = get_user_slot()
   );
 
--- Club members + final years: read all
-CREATE POLICY "club_read_participants" ON participants
-  FOR SELECT USING (
-    get_user_role() IN ('club_member', 'final_year')
-  );
+-- Club members: full control (read, edit names, delete, add on-spot entries)
+CREATE POLICY "club_manage_participants" ON participants
+  FOR ALL USING (get_user_role() = 'club_member');
 
 -- Final years: full control
 CREATE POLICY "admin_participants" ON participants

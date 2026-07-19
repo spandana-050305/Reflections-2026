@@ -4,8 +4,8 @@ import { Calendar, MapPin, User } from 'lucide-react'
 
 export default async function ClubSchedulePage() {
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/')
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) redirect('/')
 
   const { data: events } = await supabase
     .from('events')
@@ -35,10 +35,10 @@ export default async function ClubSchedulePage() {
         <div className="card text-center text-gray-400 py-12">Schedule not published yet.</div>
       )}
 
-      {Object.entries(byDate).map(([date, dayEvents]) => (
+      {Object.keys(byDate).sort().map(date => { const dayEvents = byDate[date]; return (
         <div key={date} className="card">
           <h3 className="font-semibold text-gray-700 mb-3 pb-2 border-b border-gray-100">
-            {new Date(date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            {new Date(date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </h3>
           <div className="space-y-2">
             {dayEvents.map((ev: any) => {
@@ -83,7 +83,7 @@ export default async function ClubSchedulePage() {
             })}
           </div>
         </div>
-      ))}
+      )})}
 
       {unscheduled.length > 0 && (
         <div className="card">

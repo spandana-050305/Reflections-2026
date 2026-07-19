@@ -15,7 +15,6 @@ type Step = 'category' | 'event' | 'judge' | 'locked' | 'trial' | 'ready' | 'rea
 interface EntryRow {
   slot_number: number
   entry_index: number
-  names: string
 }
 
 export default function GuestEvaluatePage() {
@@ -26,7 +25,6 @@ export default function GuestEvaluatePage() {
 
   const [categories, setCategories] = useState<Category[]>([])
   const [events, setEvents] = useState<Event[]>([])
-  const [schools, setSchools] = useState<any[]>([])
 
   const [categoryId, setCategoryId] = useState<string | null>(null)
   const [event, setEvent] = useState<Event | null>(null)
@@ -51,14 +49,18 @@ export default function GuestEvaluatePage() {
 
   async function loadCategoriesAndEvents() {
     setLoading(true)
-    const [{ data: cats }, { data: evs }, { data: sch }] = await Promise.all([
+    const [{ data: cats, error: catsErr }, { data: evs, error: evsErr }] = await Promise.all([
       supabase.from('categories').select('*').order('display_order'),
       supabase.from('events').select('*, categories(name)').order('name'),
-      supabase.from('schools').select('slot_number, school_name').order('slot_number'),
     ])
+    const firstErr = catsErr ?? evsErr
+    if (firstErr) {
+      setSubmitError(`Failed to load events: ${firstErr.message}`)
+      setLoading(false)
+      return
+    }
     setCategories(cats ?? [])
     setEvents((evs as Event[]) ?? [])
-    setSchools(sch ?? [])
     setLoading(false)
   }
 
@@ -80,26 +82,27 @@ export default function GuestEvaluatePage() {
   }
 
   async function loadParticipantsForEvent(ev: Event) {
-    const { data: participantData } = await supabase
+    // Fetch only slot/entry — no names or school data reaches the judge UI
+    const { data: participantData, error: partErr } = await supabase
       .from('participants')
-      .select('slot_number, entry_index, member_index, participant_name')
+      .select('slot_number, entry_index')
       .eq('event_id', ev.id)
       .order('slot_number')
       .order('entry_index')
-      .order('member_index')
 
-    const grouped: Record<number, Record<number, string[]>> = {}
-    ;(participantData ?? []).forEach((p: any) => {
-      if (!grouped[p.slot_number]) grouped[p.slot_number] = {}
-      if (!grouped[p.slot_number][p.entry_index]) grouped[p.slot_number][p.entry_index] = []
-      grouped[p.slot_number][p.entry_index].push(p.participant_name)
-    })
+    if (partErr) {
+      setSubmitError(`Failed to load participants: ${partErr.message}`)
+      return
+    }
 
+    const seen = new Set<string>()
     const flat: EntryRow[] = []
-    Object.keys(grouped).map(Number).sort((a, b) => a - b).forEach(slot => {
-      Object.keys(grouped[slot]).map(Number).sort((a, b) => a - b).forEach(entryIdx => {
-        flat.push({ slot_number: slot, entry_index: entryIdx, names: grouped[slot][entryIdx].join(', ') })
-      })
+    ;(participantData ?? []).forEach((p: any) => {
+      const k = `${p.slot_number}_${p.entry_index}`
+      if (!seen.has(k)) {
+        seen.add(k)
+        flat.push({ slot_number: p.slot_number, entry_index: p.entry_index })
+      }
     })
     setRows(flat)
 
@@ -129,16 +132,18 @@ export default function GuestEvaluatePage() {
 
     // Persist the assignees entered for this event.
     const cleanAssignees = assignees.map(a => a.trim()).filter(Boolean)
-    await supabase.from('events')
+    const { error: updateErr } = await supabase.from('events')
       .update({ assigned_members: cleanAssignees.length > 0 ? cleanAssignees : null })
       .eq('id', event.id)
+    if (updateErr) { setSubmitError(`Failed to save assignees: ${updateErr.message}`); return }
 
     // Look for marks this judge has already submitted for this event.
-    const { data: existing } = await supabase
+    const { data: existing, error: fetchErr } = await supabase
       .from('guest_marks')
       .select('*')
       .eq('event_id', event.id)
       .eq('judge_number', judgeNumber)
+    if (fetchErr) { setSubmitError(`Failed to check existing marks: ${fetchErr.message}`); return }
 
     const existingMarks = existing ?? []
 
@@ -211,7 +216,7 @@ export default function GuestEvaluatePage() {
       entry_index: r.entry_index,
       criteria_scores: criteriaScores,
       judge_total: judgeTotal,
-    }, { onConflict: ['event_id', 'judge_number', 'slot_number', 'entry_index'] })
+    }, { onConflict: 'event_id,judge_number,slot_number,entry_index' })
 
     if (error) {
       setSubmitError('Error saving marks: ' + error.message)
@@ -258,10 +263,6 @@ export default function GuestEvaluatePage() {
     rows.forEach(r => { reset[rowKey(r.slot_number, r.entry_index)] = emptyScores() })
     setScores(reset)
     setStep('judge')
-  }
-
-  function schoolName(slot: number) {
-    return schools.find(s => s.slot_number === slot)?.school_name
   }
 
   if (loading) {
@@ -456,7 +457,7 @@ export default function GuestEvaluatePage() {
               <thead>
                 <tr className="bg-gray-50">
                   <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 border border-gray-100">Slot</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 border border-gray-100">Participant</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 border border-gray-100">Entry</th>
                   {Array.from({ length: totalCriteria }, (_, i) => (
                     <th key={i} className="px-2 py-2 text-xs font-semibold text-gray-500 border border-gray-100 text-center">{criteriaLabel(i)}</th>
                   ))}
@@ -468,8 +469,7 @@ export default function GuestEvaluatePage() {
                 <tr className={trialSubmitted ? 'bg-green-50/40' : 'hover:bg-gray-50'}>
                   <td className="px-3 py-2 border border-gray-100 font-medium text-gray-700">{currentRow?.slot_number ?? '—'}</td>
                   <td className="px-3 py-2 border border-gray-100">
-                    <p className="text-gray-800">{currentRow ? (currentRow.names || `Slot ${currentRow.slot_number}`) : 'Practice entry'}</p>
-                    {currentRow && <p className="text-xs text-gray-400">{schoolName(currentRow.slot_number)}</p>}
+                    <p className="text-gray-800">Entry {currentRow ? currentRow.entry_index : 1}</p>
                   </td>
                   {rowScores.map((val, i) => (
                     <td key={i} className="px-2 py-1.5 border border-gray-100">
@@ -537,9 +537,7 @@ export default function GuestEvaluatePage() {
     const totalCriteria = event.criteria_count ?? 4
     const q = search.trim().toLowerCase()
     const visibleRows = q
-      ? rows.filter(r => String(r.slot_number).includes(q)
-          || r.names.toLowerCase().includes(q)
-          || (schoolName(r.slot_number) ?? '').toLowerCase().includes(q))
+      ? rows.filter(r => String(r.slot_number).includes(q))
       : rows
 
     const allDone = rows.length > 0 && submittedRows.size >= rows.length
@@ -571,7 +569,7 @@ export default function GuestEvaluatePage() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search slot number, participant or school…"
+            placeholder="Search slot number…"
             className="input pl-9"
             inputMode="search"
           />
@@ -588,7 +586,7 @@ export default function GuestEvaluatePage() {
               <thead>
                 <tr className="bg-gray-50">
                   <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 border border-gray-100">Slot</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 border border-gray-100">Participant</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 border border-gray-100">Entry</th>
                   {Array.from({ length: totalCriteria }, (_, i) => (
                     <th key={i} className="px-2 py-2 text-xs font-semibold text-gray-500 border border-gray-100 text-center">{criteriaLabel(i)}</th>
                   ))}
@@ -607,8 +605,7 @@ export default function GuestEvaluatePage() {
                     <tr key={key} className={isSubmitted ? 'bg-green-50/40' : 'hover:bg-gray-50'}>
                       <td className="px-3 py-2 border border-gray-100 font-medium text-gray-700">{r.slot_number}</td>
                       <td className="px-3 py-2 border border-gray-100">
-                        <p className="text-gray-800">{r.names}</p>
-                        <p className="text-xs text-gray-400">{schoolName(r.slot_number)}</p>
+                        <p className="text-gray-800">Slot {r.slot_number} — Entry {r.entry_index}</p>
                       </td>
                       {rowScores.map((val, i) => (
                         <td key={i} className="px-2 py-1.5 border border-gray-100">

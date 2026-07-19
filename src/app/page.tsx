@@ -56,7 +56,13 @@ export default function LoginPage() {
         status: 'pending',
         created_at: new Date().toISOString(),
       })
-      if (dbErr) { setError(dbErr.message); setLoading(false); return }
+      if (dbErr) {
+        // Sign out the orphaned auth user we just created so they can't accidentally log in
+        await supabase.auth.signOut()
+        setError(`Registration failed: ${dbErr.message}. Please try again or contact the admin.`)
+        setLoading(false)
+        return
+      }
       setRegDone(true)
       setLoading(false)
     } catch (err: any) {
@@ -98,9 +104,9 @@ export default function LoginPage() {
     <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden bg-white">
       {/* Animated pink gradient blobs */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-pink-200/40 blur-3xl animate-float-slow" />
-        <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-pink-100/60 blur-3xl animate-float" />
-        <div className="absolute top-1/2 left-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-rose-100/30 blur-3xl animate-pulse-glow" />
+        <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-brand-300/40 blur-3xl animate-float-slow" />
+        <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-brand-200/60 blur-3xl animate-float" />
+        <div className="absolute top-1/2 left-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-100/40 blur-3xl animate-pulse-glow" />
       </div>
       {/* Subtle dot texture */}
       <div className="pointer-events-none absolute inset-0 dot-grid opacity-40" />
@@ -127,9 +133,9 @@ export default function LoginPage() {
         </div>
 
         {/* Login Card */}
-        <div className="rounded-2xl border border-pink-100 bg-white shadow-lg shadow-pink-100/50 overflow-hidden">
-          {/* Pink accent stripe at top */}
-          <div className="h-1 w-full bg-gradient-to-r from-pink-400 via-rose-400 to-pink-500" />
+        <div className="rounded-2xl border border-brand-200 bg-white shadow-lg shadow-brand-200/50 overflow-hidden">
+          {/* Rotaract accent stripe at top */}
+          <div className="h-1 w-full bg-gradient-to-r from-brand-500 via-brand-600 to-brand-700" />
 
           <div className="p-8">
             {mode === 'login' ? (

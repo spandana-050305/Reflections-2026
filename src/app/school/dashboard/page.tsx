@@ -7,28 +7,34 @@ import type { Announcement } from '@/lib/types'
 
 export default async function SchoolDashboard() {
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user
   if (!user) redirect('/')
 
-  const slotNumber = user.user_metadata?.slot_number as number
+  const slotNumber = user.user_metadata?.slot_number as number | undefined
+  if (!slotNumber) redirect('/')
 
   const [
     { data: announcements },
     { data: events },
     { data: myParticipants },
     { data: settings },
+    { data: schoolRow },
   ] = await Promise.all([
     supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(5),
-    supabase.from('events').select('id').not('event_date', 'is', null),
+    supabase.from('events').select('id'),
     supabase.from('participants').select('event_id').eq('slot_number', slotNumber),
     supabase.from('settings').select('registration_open').single(),
+    supabase.from('schools').select('school_name').eq('slot_number', slotNumber).single(),
   ])
+
+  const schoolName = schoolRow?.school_name ?? `Slot ${slotNumber}`
 
   const totalEvents = events?.length ?? 0
   const filledEvents = new Set((myParticipants ?? []).map((p: { event_id: string }) => p.event_id)).size
   const totalParticipants = (myParticipants ?? []).length
 
-  const pct = totalEvents > 0 ? Math.round((filledEvents / totalEvents) * 100) : 0
+  const pct = totalEvents > 0 ? Math.min(100, Math.round((filledEvents / totalEvents) * 100)) : 0
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in-up">
@@ -39,7 +45,7 @@ export default async function SchoolDashboard() {
           <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/80 mb-2">
             <Sparkles size={13} /> School Portal
           </p>
-          <h2 className="text-2xl sm:text-3xl font-bold">Welcome, Slot {slotNumber}</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold">Welcome, {schoolName}</h2>
           <p className="text-white/85 mt-1.5 text-sm">Reflections Event Management</p>
         </div>
       </div>
@@ -101,7 +107,7 @@ export default async function SchoolDashboard() {
             </div>
             <div>
               <p className="text-3xl font-bold text-gray-700 leading-none">{totalEvents}</p>
-              <p className="text-sm text-gray-500 mt-1">Total events scheduled</p>
+              <p className="text-sm text-gray-500 mt-1">Total events</p>
             </div>
           </div>
         </div>

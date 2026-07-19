@@ -2,15 +2,17 @@ import { createClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import {
   LayoutDashboard, ListChecks, Users,
-  TableProperties, Trophy, School, Megaphone, Settings, ClipboardCheck, UserCheck, Clock, XCircle
+  TableProperties, Trophy, School, Megaphone, Settings, ClipboardCheck, UserCheck, Clock, XCircle, Pencil
 } from 'lucide-react'
 import NavBar from '@/components/layout/NavBar'
 import NavLink from '@/components/layout/NavLink'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user
   if (!user) redirect('/')
+  if (user.user_metadata?.role !== 'final_year') redirect('/')
 
   // Self-registered Final Years need approval before getting full access.
   // Seeded / admin-created accounts have no club_accounts row → allowed through.
@@ -46,6 +48,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/admin/events', label: 'Events', icon: ListChecks },
     { href: '/admin/participants', label: 'Participants', icon: Users },
+    { href: '/admin/manual-marks', label: 'Manual Marks', icon: Pencil },
     { href: '/admin/guest-marks', label: 'Guest Marks', icon: ClipboardCheck },
     { href: '/admin/points', label: 'Points Table', icon: TableProperties },
     { href: '/admin/results', label: 'Results', icon: Trophy },

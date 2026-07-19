@@ -4,7 +4,8 @@ import NavBar from '@/components/layout/NavBar'
 
 export default async function GuestLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user
   if (!user) redirect('/')
   if (user.user_metadata?.role !== 'guest') redirect('/')
 

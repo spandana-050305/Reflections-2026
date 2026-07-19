@@ -8,21 +8,21 @@ export const MOCK_CATEGORIES = [
 ]
 
 export const MOCK_EVENTS = [
-  { id: 'ev-1', category_id: 'cat-a', name: 'Best Speaker', rulebook_url: null, max_entries: 2, is_team_event: false, team_size: null, event_date: '2025-08-10', event_time: '09:00', venue: 'Main Hall', assigned_members: null, criteria_count: 4, created_at: new Date().toISOString(), categories: MOCK_CATEGORIES[0] },
-  { id: 'ev-2', category_id: 'cat-a', name: 'Debate', rulebook_url: null, max_entries: 1, is_team_event: true, team_size: 2, event_date: '2025-08-10', event_time: '11:00', venue: 'Main Hall', assigned_members: null, criteria_count: 4, created_at: new Date().toISOString(), categories: MOCK_CATEGORIES[0] },
-  { id: 'ev-3', category_id: 'cat-a', name: 'Essay Writing', rulebook_url: null, max_entries: 2, is_team_event: false, team_size: null, event_date: '2025-08-11', event_time: '09:00', venue: 'Room 101', assigned_members: null, criteria_count: 3, created_at: new Date().toISOString(), categories: MOCK_CATEGORIES[0] },
-  { id: 'ev-4', category_id: 'cat-b', name: 'Drawing', rulebook_url: null, max_entries: 2, is_team_event: false, team_size: null, event_date: '2025-08-11', event_time: '10:00', venue: 'Art Room', assigned_members: null, criteria_count: 3, created_at: new Date().toISOString(), categories: MOCK_CATEGORIES[1] },
-  { id: 'ev-5', category_id: 'cat-b', name: 'Collage', rulebook_url: null, max_entries: 1, is_team_event: true, team_size: 3, event_date: '2025-08-11', event_time: '13:00', venue: 'Art Room', assigned_members: null, criteria_count: 3, created_at: new Date().toISOString(), categories: MOCK_CATEGORIES[1] },
-  { id: 'ev-6', category_id: 'cat-c', name: 'Dance', rulebook_url: null, max_entries: 1, is_team_event: true, team_size: 5, event_date: '2025-08-12', event_time: '09:00', venue: 'Auditorium', assigned_members: null, criteria_count: 4, created_at: new Date().toISOString(), categories: MOCK_CATEGORIES[2] },
-  { id: 'ev-7', category_id: 'cat-c', name: 'Singing', rulebook_url: null, max_entries: 2, is_team_event: false, team_size: null, event_date: '2025-08-12', event_time: '11:30', venue: 'Auditorium', assigned_members: null, criteria_count: 4, created_at: new Date().toISOString(), categories: MOCK_CATEGORIES[2] },
-  { id: 'ev-8', category_id: 'cat-d', name: 'Quiz', rulebook_url: null, max_entries: 1, is_team_event: true, team_size: 3, event_date: '2025-08-12', event_time: '14:00', venue: 'Conference Room', assigned_members: null, criteria_count: 4, created_at: new Date().toISOString(), categories: MOCK_CATEGORIES[3] },
-  { id: 'ev-9', category_id: 'cat-d', name: 'Science Model', rulebook_url: null, max_entries: 1, is_team_event: true, team_size: 2, event_date: '2025-08-13', event_time: '10:00', venue: 'Science Lab', assigned_members: null, criteria_count: 4, created_at: new Date().toISOString(), categories: MOCK_CATEGORIES[3] },
+  { id: 'ev-1', category_id: 'cat-a', name: 'Best Speaker', rulebook_url: null, max_entries: 2, is_team_event: false, team_size: null, event_date: '2025-08-10', event_time: '09:00', venue: 'Main Hall', assigned_members: null, criteria_count: 4, criteria_names: null, rules: null, created_at: new Date().toISOString(), categories: MOCK_CATEGORIES[0] },
+  { id: 'ev-2', category_id: 'cat-a', name: 'Debate', rulebook_url: null, max_entries: 1, is_team_event: true, team_size: 2, event_date: '2025-08-10', event_time: '11:00', venue: 'Main Hall', assigned_members: null, criteria_count: 4, criteria_names: null, rules: null, created_at: new Date().toISOString(), categories: MOCK_CATEGORIES[0] },
+  { id: 'ev-3', category_id: 'cat-a', name: 'Essay Writing', rulebook_url: null, max_entries: 2, is_team_event: false, team_size: null, event_date: '2025-08-11', event_time: '09:00', venue: 'Room 101', assigned_members: null, criteria_count: 3, criteria_names: null, rules: null, created_at: new Date().toISOString(), categories: MOCK_CATEGORIES[0] },
+  { id: 'ev-4', category_id: 'cat-b', name: 'Drawing', rulebook_url: null, max_entries: 2, is_team_event: false, team_size: null, event_date: '2025-08-11', event_time: '10:00', venue: 'Art Room', assigned_members: null, criteria_count: 3, criteria_names: null, rules: null, created_at: new Date().toISOString(), categories: MOCK_CATEGORIES[1] },
+  { id: 'ev-5', category_id: 'cat-b', name: 'Collage', rulebook_url: null, max_entries: 1, is_team_event: true, team_size: 3, event_date: '2025-08-11', event_time: '13:00', venue: 'Art Room', assigned_members: null, criteria_count: 3, criteria_names: null, rules: null, created_at: new Date().toISOString(), categories: MOCK_CATEGORIES[1] },
+  { id: 'ev-6', category_id: 'cat-c', name: 'Dance', rulebook_url: null, max_entries: 1, is_team_event: true, team_size: 5, event_date: '2025-08-12', event_time: '09:00', venue: 'Auditorium', assigned_members: null, criteria_count: 4, criteria_names: null, rules: null, created_at: new Date().toISOString(), categories: MOCK_CATEGORIES[2] },
+  { id: 'ev-7', category_id: 'cat-c', name: 'Singing', rulebook_url: null, max_entries: 2, is_team_event: false, team_size: null, event_date: '2025-08-12', event_time: '11:30', venue: 'Auditorium', assigned_members: null, criteria_count: 4, criteria_names: null, rules: null, created_at: new Date().toISOString(), categories: MOCK_CATEGORIES[2] },
+  { id: 'ev-8', category_id: 'cat-d', name: 'Quiz', rulebook_url: null, max_entries: 1, is_team_event: true, team_size: 3, event_date: '2025-08-12', event_time: '14:00', venue: 'Conference Room', assigned_members: null, criteria_count: 4, criteria_names: null, rules: null, created_at: new Date().toISOString(), categories: MOCK_CATEGORIES[3] },
+  { id: 'ev-9', category_id: 'cat-d', name: 'Science Model', rulebook_url: null, max_entries: 1, is_team_event: true, team_size: 2, event_date: '2025-08-13', event_time: '10:00', venue: 'Science Lab', assigned_members: null, criteria_count: 4, criteria_names: null, rules: null, created_at: new Date().toISOString(), categories: MOCK_CATEGORIES[3] },
 ]
 
 export const MOCK_SCHOOLS = [
-  { id: 'school-1', user_id: 'local-school-1', school_name: 'St. Joseph\'s School', slot_number: 1, created_at: new Date().toISOString() },
-  { id: 'school-2', user_id: 'local-school-2', school_name: 'Holy Cross School', slot_number: 2, created_at: new Date().toISOString() },
-  { id: 'school-3', user_id: 'local-school-3', school_name: 'National Public School', slot_number: 3, created_at: new Date().toISOString() },
+  { id: 'school-1', user_id: 'local-school-1', school_name: 'St. Joseph\'s School', slot_number: 1, email: 'slot1@reflections.in', password_plain: 'slot123', created_at: new Date().toISOString() },
+  { id: 'school-2', user_id: 'local-school-2', school_name: 'Holy Cross School', slot_number: 2, email: 'slot2@reflections.in', password_plain: 'slot123', created_at: new Date().toISOString() },
+  { id: 'school-3', user_id: 'local-school-3', school_name: 'National Public School', slot_number: 3, email: 'slot3@reflections.in', password_plain: 'slot123', created_at: new Date().toISOString() },
 ]
 
 export const MOCK_PARTICIPANTS = [
@@ -64,6 +64,6 @@ export const MOCK_ANNOUNCEMENTS = [
   { id: 'ann-2', title: 'Rulebooks Available', message: 'Rulebooks for all events have been uploaded. Please review them carefully before submitting participants.', created_at: new Date(Date.now() - 3600000).toISOString() },
 ]
 
-export const MOCK_SETTINGS = { id: 1, registration_open: true, points_1st: 15, points_2nd: 10, points_3rd: 5 }
+export const MOCK_SETTINGS = { id: 1, registration_open: true, points_1st: 15, points_2nd: 10, points_3rd: 5, unlock_password: null, security_answer_1: null, security_answer_2: null }
 
 export const MOCK_ONSPOT: any[] = []

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { UserCheck, Check, X, Clock, CheckCircle2, XCircle, RotateCcw, Trash2 } from 'lucide-react'
 import type { ClubAccount, ClubAccountStatus } from '@/lib/types'
@@ -18,11 +18,19 @@ export default function AdminRequestsPage() {
   const [filter, setFilter] = useState<ClubAccountStatus | 'all'>('pending')
   const [flashMsg, setFlashMsg] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  function flash(msg: string) { setFlashMsg(msg); setTimeout(() => setFlashMsg(''), 3500) }
+  function flash(msg: string) {
+    if (flashTimer.current) clearTimeout(flashTimer.current)
+    setFlashMsg(msg)
+    flashTimer.current = setTimeout(() => setFlashMsg(''), 3500)
+  }
+
+  useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current) }, [])
 
   async function load() {
-    const { data } = await supabase.from('club_accounts').select('*').order('created_at', { ascending: false })
+    const { data, error } = await supabase.from('club_accounts').select('*').order('created_at', { ascending: false })
+    if (error) { flash(`❌ Failed to load requests: ${error.message}`); return }
     setAccounts((data as ClubAccount[]) ?? [])
   }
 
@@ -30,9 +38,10 @@ export default function AdminRequestsPage() {
 
   async function setStatus(acct: ClubAccount, status: ClubAccountStatus) {
     setBusy(acct.id)
-    await supabase.from('club_accounts')
+    const { error } = await supabase.from('club_accounts')
       .update({ status, reviewed_at: new Date().toISOString() })
       .eq('id', acct.id)
+    if (error) { flash(`❌ ${error.message}`); setBusy(null); return }
     await load()
     flash(`${acct.name} ${status === 'approved' ? 'approved' : status === 'rejected' ? 'rejected' : 'updated'} ✓`)
     setBusy(null)
@@ -41,9 +50,12 @@ export default function AdminRequestsPage() {
   async function deleteRequest(acct: ClubAccount) {
     if (!confirm(`Delete ${acct.name}'s request? This also removes their login (${acct.email}). They'd have to register again.`)) return
     setBusy(acct.id)
-    // Remove the request and free the login so the email can be reused.
-    await supabase.from('club_accounts').delete().eq('id', acct.id)
-    await supabase.from('users').delete().eq('email', acct.email)
+    const res = await fetch('/api/admin/delete-club-account', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: acct.id, email: acct.email }),
+    })
+    if (!res.ok) { flash(`❌ Delete failed (${res.status})`); setBusy(null); return }
     await load()
     flash(`${acct.name}'s request deleted ✓`)
     setBusy(null)
@@ -68,7 +80,7 @@ export default function AdminRequestsPage() {
       </div>
 
       {flashMsg && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-2.5 rounded-xl text-sm font-medium">{flashMsg}</div>
+        <div className={`px-4 py-2.5 rounded-xl text-sm font-medium ${flashMsg.startsWith('❌') ? 'bg-red-50 border border-red-100 text-red-600' : 'bg-green-50 border border-green-200 text-green-700'}`}>{flashMsg}</div>
       )}
 
       <div className="flex gap-2 flex-wrap">

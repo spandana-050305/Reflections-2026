@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Settings, Lock, Unlock, Plus, Trash2, Copy, Eye, EyeOff, FileDown, KeyRound, X, Save, Layers, ShieldCheck } from 'lucide-react'
 import * as XLSX from 'xlsx'
@@ -48,19 +48,35 @@ export default function AdminSettingsPage() {
   const [showReset, setShowReset] = useState(false)
   const [resetForm, setResetForm] = useState({ a1: '', a2: '', password: '' })
 
+  const pwMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const gMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const regMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => {
+    if (pwMsgTimer.current) clearTimeout(pwMsgTimer.current)
+    if (gMsgTimer.current) clearTimeout(gMsgTimer.current)
+    if (regMsgTimer.current) clearTimeout(regMsgTimer.current)
+  }, [])
+
   function showPwMsg(text: string, type: 'success' | 'error' = 'success') {
-    setPwMsg(text); setPwMsgType(type); setTimeout(() => setPwMsg(''), 5000)
+    if (pwMsgTimer.current) clearTimeout(pwMsgTimer.current)
+    setPwMsg(text); setPwMsgType(type)
+    pwMsgTimer.current = setTimeout(() => setPwMsg(''), 5000)
   }
 
   useEffect(() => {
-    supabase.from('settings').select('*').single().then(({ data }: { data: any }) => {
-      if (data) {
+    async function loadSettings() {
+      const { data, error } = await supabase.from('settings').select('*').single()
+      if (error) {
+        setMessage(`❌ Failed to load settings: ${error.message}`)
+      } else if (data) {
         setRegistrationOpen(data.registration_open)
         setHasUnlockPassword(!!data.unlock_password)
         setStoredAnswers({ a1: data.security_answer_1 ?? '', a2: data.security_answer_2 ?? '' })
       }
       setLoading(false)
-    })
+    }
+    loadSettings()
     loadGuestCreds()
   }, [])
 
@@ -68,16 +84,17 @@ export default function AdminSettingsPage() {
     if (!pwForm.password.trim()) { showPwMsg('Enter a password.', 'error'); return }
     if (!pwForm.a1.trim() || !pwForm.a2.trim()) { showPwMsg('Answer both security questions.', 'error'); return }
     setPwSaving(true)
-    await supabase.from('settings').update({
+    const { error } = await supabase.from('settings').update({
       unlock_password: pwForm.password.trim(),
       security_answer_1: pwForm.a1.trim(),
       security_answer_2: pwForm.a2.trim(),
     }).eq('id', 1)
+    setPwSaving(false)
+    if (error) { showPwMsg(`❌ ${error.message}`, 'error'); return }
     setHasUnlockPassword(true)
     setStoredAnswers({ a1: pwForm.a1.trim(), a2: pwForm.a2.trim() })
     setPwForm({ password: '', a1: '', a2: '' })
     showPwMsg('Unlock password set.')
-    setPwSaving(false)
   }
 
   async function resetUnlockPassword() {
@@ -87,15 +104,17 @@ export default function AdminSettingsPage() {
     }
     if (!resetForm.password.trim()) { showPwMsg('Enter a new password.', 'error'); return }
     setPwSaving(true)
-    await supabase.from('settings').update({ unlock_password: resetForm.password.trim() }).eq('id', 1)
+    const { error } = await supabase.from('settings').update({ unlock_password: resetForm.password.trim() }).eq('id', 1)
+    setPwSaving(false)
+    if (error) { showPwMsg(`❌ ${error.message}`, 'error'); return }
     setResetForm({ a1: '', a2: '', password: '' })
     setShowReset(false)
     showPwMsg('Unlock password reset.')
-    setPwSaving(false)
   }
 
   async function loadGuestCreds() {
-    const { data } = await supabase.from('guest_credentials').select('*').order('login_id')
+    const { data, error } = await supabase.from('guest_credentials').select('*').order('login_id')
+    if (error) { showGMsg(`❌ Failed to load credentials: ${error.message}`, 'error'); return }
     setGuestCreds(data ?? [])
   }
 
@@ -103,17 +122,20 @@ export default function AdminSettingsPage() {
     const action = newValue ? 'open' : 'close'
     if (!confirm(`Are you sure you want to ${action} registration? ${!newValue ? 'Schools will no longer be able to edit participants.' : 'Schools will be able to edit their participants again.'}`)) return
     setSaving(true)
-    await supabase.from('settings').update({ registration_open: newValue }).eq('id', 1)
+    const { error } = await supabase.from('settings').update({ registration_open: newValue }).eq('id', 1)
+    setSaving(false)
+    if (error) { setMessage(`❌ ${error.message}`); if (regMsgTimer.current) clearTimeout(regMsgTimer.current); regMsgTimer.current = setTimeout(() => setMessage(''), 4000); return }
     setRegistrationOpen(newValue)
     setMessage(`Registration is now ${newValue ? 'OPEN' : 'CLOSED'}.`)
-    setSaving(false)
-    setTimeout(() => setMessage(''), 4000)
+    if (regMsgTimer.current) clearTimeout(regMsgTimer.current)
+    regMsgTimer.current = setTimeout(() => setMessage(''), 4000)
   }
 
   function showGMsg(text: string, type: 'success' | 'error' = 'success') {
+    if (gMsgTimer.current) clearTimeout(gMsgTimer.current)
     setGMessage(text)
     setGMessageType(type)
-    setTimeout(() => setGMessage(''), 5000)
+    gMsgTimer.current = setTimeout(() => setGMessage(''), 5000)
   }
 
   async function createGuestCredential(loginId: string): Promise<{ ok: boolean; error?: string }> {
@@ -124,19 +146,15 @@ export default function AdminSettingsPage() {
     const email = loginIdToEmail(slug)
     const password = generatePassword()
 
-    const { error: authErr } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { role: 'guest' } },
+    // Use server-side API route so the admin session is never replaced
+    // and the new user is created pre-confirmed (no email confirmation needed).
+    const res = await fetch('/api/admin/create-guest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, loginId: slug }),
     })
-    if (authErr) return { ok: false, error: authErr.message }
-
-    const { error: dbErr } = await supabase.from('guest_credentials').insert({
-      login_id: slug,
-      email,
-      password_plain: password,
-    })
-    if (dbErr) return { ok: false, error: dbErr.message }
+    const json = await res.json()
+    if (!res.ok) return { ok: false, error: json.error ?? 'Failed to create credential.' }
 
     return { ok: true }
   }
@@ -182,7 +200,12 @@ export default function AdminSettingsPage() {
 
   async function handleDeleteGuestCred(cred: any) {
     if (!confirm(`Delete credential "${cred.login_id}"? The guest will no longer be able to log in.`)) return
-    await supabase.from('guest_credentials').delete().eq('id', cred.id)
+    const res = await fetch('/api/admin/create-guest', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cred.email, credId: cred.id }),
+    })
+    if (!res.ok) { showGMsg(`❌ Delete failed (${res.status})`, 'error'); return }
     await loadGuestCreds()
   }
 
@@ -265,9 +288,9 @@ export default function AdminSettingsPage() {
         </div>
 
         {message && (
-          <p className="text-sm font-medium text-gray-700 mt-3 bg-gray-50 px-4 py-2 rounded-lg">
-            ✓ {message}
-          </p>
+          <div className={`text-sm font-medium mt-3 px-4 py-2 rounded-lg ${message.startsWith('❌') ? 'bg-red-50 text-red-700' : 'bg-gray-50 text-gray-700'}`}>
+            {message.startsWith('❌') ? message : `✓ ${message}`}
+          </div>
         )}
       </div>
 

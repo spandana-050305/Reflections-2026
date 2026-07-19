@@ -6,8 +6,10 @@ import NavLink from '@/components/layout/NavLink'
 
 export default async function ClubLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user
   if (!user) redirect('/')
+  if (user.user_metadata?.role !== 'club_member') redirect('/')
 
   // Self-registered club members must be approved by the Super Admin.
   // Seeded / admin-created accounts have no club_accounts row → allowed through.

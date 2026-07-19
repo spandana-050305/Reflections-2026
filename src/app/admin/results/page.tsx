@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Trophy, Lock, CheckCircle2, Clock } from 'lucide-react'
 import type { Category, Event } from '@/lib/types'
@@ -14,7 +14,6 @@ function parseWinners(result: any): WinnerGroup[] {
 }
 
 const RANK_LABELS: Record<number, string> = { 1: '🥇 1st Place', 2: '🥈 2nd Place', 3: '🥉 3rd Place' }
-const RANK_PTS: Record<number, number> = { 1: 15, 2: 10, 3: 5 }
 const RANK_BG: Record<number, string> = {
   1: 'bg-amber-50 border-amber-200',
   2: 'bg-gray-50 border-gray-200',
@@ -29,18 +28,38 @@ export default function AdminResultsPage() {
   const [results, setResults] = useState<any[]>([])
   const [selectedCat, setSelectedCat] = useState('')
   const [message, setMessage] = useState('')
+  const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function showMessage(text: string) {
+    if (msgTimer.current) clearTimeout(msgTimer.current)
+    setMessage(text)
+    msgTimer.current = setTimeout(() => setMessage(''), 3000)
+  }
+
+  useEffect(() => () => { if (msgTimer.current) clearTimeout(msgTimer.current) }, [])
+  const [rankPts, setRankPts] = useState<Record<number, number>>({ 1: 15, 2: 10, 3: 5 })
 
   async function load() {
-    const [{ data: cats }, { data: evs }, { data: sc }, { data: res }] = await Promise.all([
+    const [
+      { data: cats, error: catsErr },
+      { data: evs,  error: evsErr  },
+      { data: sc,   error: scErr   },
+      { data: res,  error: resErr  },
+      { data: stg,  error: stgErr  },
+    ] = await Promise.all([
       supabase.from('categories').select('*').order('display_order'),
       supabase.from('events').select('*').order('name'),
       supabase.from('schools').select('slot_number, school_name').order('slot_number'),
       supabase.from('results').select('*'),
+      supabase.from('settings').select('points_1st, points_2nd, points_3rd').single(),
     ])
+    const firstErr = catsErr ?? evsErr ?? scErr ?? resErr ?? stgErr
+    if (firstErr) { showMessage(`❌ Failed to load: ${firstErr.message}`); return }
     setCategories(cats ?? [])
     setEvents(evs ?? [])
     setSchools(sc ?? [])
     setResults(res ?? [])
+    if (stg) setRankPts({ 1: stg.points_1st ?? 15, 2: stg.points_2nd ?? 10, 3: stg.points_3rd ?? 5 })
     if (cats?.[0]) setSelectedCat(prev => prev || cats[0].id)
   }
 
@@ -52,10 +71,10 @@ export default function AdminResultsPage() {
   }
 
   async function togglePublish(eventId: string, currentlyPublished: boolean) {
-    await supabase.from('results').update({ published: !currentlyPublished }).eq('event_id', eventId)
-    setMessage(currentlyPublished ? 'Result unpublished.' : 'Result published to schools!')
+    const { error } = await supabase.from('results').update({ published: !currentlyPublished }).eq('event_id', eventId)
+    if (error) { showMessage(`❌ ${error.message}`); return }
+    showMessage(currentlyPublished ? 'Result unpublished.' : 'Result published to schools!')
     await load()
-    setTimeout(() => setMessage(''), 3000)
   }
 
   const eventsInCat = events.filter(e => e.category_id === selectedCat)
@@ -71,7 +90,7 @@ export default function AdminResultsPage() {
       </div>
 
       {message && (
-        <div className="bg-green-50 border border-green-200 text-green-800 text-sm px-4 py-3 rounded-xl">
+        <div className={`text-sm px-4 py-3 rounded-xl ${message.startsWith('❌') ? 'bg-red-50 border border-red-100 text-red-600' : 'bg-green-50 border border-green-200 text-green-800'}`}>
           {message}
         </div>
       )}
@@ -126,7 +145,7 @@ export default function AdminResultsPage() {
                         <div key={group.rank} className={`border rounded-lg px-3 py-2.5 ${RANK_BG[group.rank] ?? 'bg-gray-50 border-gray-200'}`}>
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-sm font-semibold text-gray-700">{RANK_LABELS[group.rank] ?? `#${group.rank}`}</span>
-                            <span className="text-xs text-brand-600 font-medium">+{RANK_PTS[group.rank] ?? 0} pts each</span>
+                            <span className="text-xs text-brand-600 font-medium">+{rankPts[group.rank] ?? 0} pts each</span>
                             {group.entries.length > 1 && (
                               <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
                                 Tied ({group.entries.length} entries)
@@ -159,9 +178,9 @@ export default function AdminResultsPage() {
                     // Old-format result (no winners_json)
                     <div className="flex gap-3 flex-wrap">
                       {[
-                        { label: '🥇 1st', slot: result.first_slot, pts: 15 },
-                        { label: '🥈 2nd', slot: result.second_slot, pts: 10 },
-                        { label: '🥉 3rd', slot: result.third_slot, pts: 5 },
+                        { label: '🥇 1st', slot: result.first_slot, pts: rankPts[1] },
+                        { label: '🥈 2nd', slot: result.second_slot, pts: rankPts[2] },
+                        { label: '🥉 3rd', slot: result.third_slot, pts: rankPts[3] },
                       ].map(({ label, slot, pts }) => (
                         <div key={label} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm">
                           <span className="text-gray-500 text-xs">{label}</span>

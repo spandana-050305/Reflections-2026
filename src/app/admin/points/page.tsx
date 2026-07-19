@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { TableProperties } from 'lucide-react'
 
@@ -15,11 +15,15 @@ export default function AdminPointsPage() {
 
   // Points settings (read-only here — configure in Marks page)
   const [pts, setPts] = useState({ p1: 15, p2: 10, p3: 5 })
+  const [loadError, setLoadError] = useState('')
 
   async function load() {
     const [
-      { data: res }, { data: sc }, { data: cats },
-      { data: evs }, { data: stg },
+      { data: res, error: resErr },
+      { data: sc,  error: scErr  },
+      { data: cats,error: catsErr},
+      { data: evs, error: evsErr },
+      { data: stg, error: stgErr },
     ] = await Promise.all([
       supabase.from('results').select('*'),
       supabase.from('schools').select('slot_number, school_name').order('slot_number'),
@@ -27,6 +31,8 @@ export default function AdminPointsPage() {
       supabase.from('events').select('id, category_id, name'),
       supabase.from('settings').select('*').single(),
     ])
+    const firstErr = resErr ?? scErr ?? catsErr ?? evsErr ?? stgErr
+    if (firstErr) { setLoadError(`❌ Failed to load: ${firstErr.message}`); return }
     setResults(res ?? [])
     setSchools(sc ?? [])
     setCategories(cats ?? [])
@@ -100,6 +106,10 @@ export default function AdminPointsPage() {
           </p>
         </div>
       </div>
+
+      {loadError && (
+        <div className="px-4 py-2.5 rounded-xl text-sm font-medium bg-red-50 border border-red-100 text-red-600">{loadError}</div>
+      )}
 
       {/* Info bar */}
       <div className="flex gap-3 text-sm flex-wrap">

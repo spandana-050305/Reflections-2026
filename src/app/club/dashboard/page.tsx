@@ -5,8 +5,8 @@ import type { Announcement } from '@/lib/types'
 
 export default async function ClubDashboard() {
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/')
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) redirect('/')
 
   const [
     { data: announcements },
@@ -14,7 +14,7 @@ export default async function ClubDashboard() {
     { count: totalParticipants },
     { count: totalEvents },
   ] = await Promise.all([
-    supabase.from('announcements').select('*').order('created_at', { ascending: false }),
+    supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(5),
     supabase.from('settings').select('registration_open').single(),
     supabase.from('participants').select('*', { count: 'exact', head: true }),
     supabase.from('events').select('*', { count: 'exact', head: true }),

@@ -35,10 +35,12 @@ export default function AdminEventsPage() {
   const [message, setMessage] = useState('')
 
   async function load() {
-    const [{ data: cats }, { data: evs }] = await Promise.all([
+    const [{ data: cats, error: catsErr }, { data: evs, error: evsErr }] = await Promise.all([
       supabase.from('categories').select('*').order('display_order'),
       supabase.from('events').select('*, categories(name)').order('name'),
     ])
+    const firstErr = catsErr ?? evsErr
+    if (firstErr) { setMessage(`❌ Failed to load: ${firstErr.message}`); return }
     setCategories(cats ?? [])
     setEvents(evs ?? [])
   }
@@ -101,20 +103,24 @@ export default function AdminEventsPage() {
     }
 
     if (editId) {
-      await supabase.from('events').update(payload).eq('id', editId)
+      const { error } = await supabase.from('events').update(payload).eq('id', editId)
+      if (error) { setMessage(`❌ ${error.message}`); setSaving(false); return }
     } else {
-      await supabase.from('events').insert(payload)
+      const { error } = await supabase.from('events').insert(payload)
+      if (error) { setMessage(`❌ ${error.message}`); setSaving(false); return }
     }
 
-    setMessage(editId ? 'Event updated!' : 'Event created!')
+    const successMsg = editId ? 'Event updated!' : 'Event created!'
     await load()
     resetForm()
+    setMessage(successMsg)
     setSaving(false)
   }
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this event? This will also delete all participant entries for it.')) return
-    await supabase.from('events').delete().eq('id', id)
+    const { error } = await supabase.from('events').delete().eq('id', id)
+    if (error) { setMessage(`❌ ${error.message}`); return }
     await load()
   }
 
@@ -136,6 +142,12 @@ export default function AdminEventsPage() {
           <Plus size={16} /> Add Event
         </button>
       </div>
+
+      {message && !showForm && (
+        <div className={`px-4 py-2.5 rounded-xl text-sm font-medium border ${message.startsWith('❌') ? 'bg-red-50 border-red-100 text-red-600' : 'bg-green-50 border-green-100 text-green-700'}`}>
+          {message}
+        </div>
+      )}
 
       {/* Form */}
       {showForm && (

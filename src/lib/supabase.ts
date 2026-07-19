@@ -12,16 +12,11 @@
 // The mock client mimics the Supabase API, so no other code needs to change.
 // ─────────────────────────────────────────────────────────────────────
 
-import { createMockBrowserClient } from './mock-client.browser'
-// import { createBrowserClient } from '@supabase/ssr'
+import { createBrowserClient } from '@supabase/ssr'
 
 export function createClient() {
-  // ─── Supabase cloud client (uncomment to go live) ──────────────────
-  // return createBrowserClient(
-  //   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  //   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  // )
-
-  // ─── Local mode (default) ──────────────────────────────────────────
-  return createMockBrowserClient() as any
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  )
 }

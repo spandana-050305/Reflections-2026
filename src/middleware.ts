@@ -1,20 +1,34 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { SESSION_COOKIE } from './lib/local-auth'
+import { createServerClient } from '@supabase/ssr'
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // API routes handle their own auth — never redirect them
   if (pathname.startsWith('/api/')) return NextResponse.next()
 
-  const sessionCookie = request.cookies.get(SESSION_COOKIE)?.value
+  const response = NextResponse.next()
 
-  let user: { user_metadata: { role: string } } | null = null
-  try {
-    if (sessionCookie) user = JSON.parse(decodeURIComponent(sessionCookie))
-  } catch {}
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) { return request.cookies.get(name)?.value },
+        set(name: string, value: string, options: Record<string, unknown>) {
+          request.cookies.set({ name, value, ...options })
+          response.cookies.set({ name, value, ...options })
+        },
+        remove(name: string, options: Record<string, unknown>) {
+          request.cookies.set({ name, value: '', ...options })
+          response.cookies.set({ name, value: '', ...options })
+        },
+      },
+    },
+  )
 
-  const role = user?.user_metadata?.role
+  const { data: { user } } = await supabase.auth.getUser()
+  const role = user?.user_metadata?.role as string | undefined
 
   // Not logged in → send to login page
   if (!user && pathname !== '/') {
@@ -26,6 +40,7 @@ export function middleware(request: NextRequest) {
     if (role === 'school')      return NextResponse.redirect(new URL('/school/dashboard', request.url))
     if (role === 'club_member') return NextResponse.redirect(new URL('/club/dashboard', request.url))
     if (role === 'final_year')  return NextResponse.redirect(new URL('/admin/dashboard', request.url))
+    if (role === 'guest')       return NextResponse.redirect(new URL('/guest/evaluate', request.url))
   }
 
   // Portal protection — wrong role gets kicked back to login
@@ -33,9 +48,10 @@ export function middleware(request: NextRequest) {
     if (pathname.startsWith('/school') && role !== 'school')      return NextResponse.redirect(new URL('/', request.url))
     if (pathname.startsWith('/club')   && role !== 'club_member') return NextResponse.redirect(new URL('/', request.url))
     if (pathname.startsWith('/admin')  && role !== 'final_year')  return NextResponse.redirect(new URL('/', request.url))
+    if (pathname.startsWith('/guest')  && role !== 'guest')       return NextResponse.redirect(new URL('/', request.url))
   }
 
-  return NextResponse.next()
+  return response
 }
 
 export const config = {

@@ -6,10 +6,12 @@ import NavLink from '@/components/layout/NavLink'
 
 export default async function SchoolLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user
   if (!user) redirect('/')
+  if (user.user_metadata?.role !== 'school') redirect('/')
 
-  const slotNumber = user.user_metadata?.slot_number as number
+  const slotNumber = user.user_metadata?.slot_number as number | undefined
 
   const navLinks = [
     { href: '/school/dashboard', label: 'Dashboard', icon: LayoutDashboard },

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import {
   ChevronDown, ChevronRight, Trophy, Users, AlertCircle, ClipboardCheck,
@@ -20,12 +20,14 @@ export default function AdminGuestMarksPage() {
   const [events, setEvents] = useState<Event[]>([])
   const [selectedCat, setSelectedCat] = useState('')
   const [guestMarks, setGuestMarks] = useState<any[]>([])
+  const [manualMarks, setManualMarks] = useState<any[]>([])
   const [participants, setParticipants] = useState<any[]>([])
   const [results, setResults] = useState<Record<string, any>>({})
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
   const [flashMsg, setFlashMsg] = useState('')
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [computeTarget, setComputeTarget] = useState<string | null>(null)
   const [lockAllTarget, setLockAllTarget] = useState<string | null>(null)
   const [fullUnlockTarget, setFullUnlockTarget] = useState<string | null>(null)
@@ -52,21 +54,39 @@ export default function AdminGuestMarksPage() {
   } | null>(null)
   const [editSaving, setEditSaving] = useState(false)
 
-  function flash(msg: string) { setFlashMsg(msg); setTimeout(() => setFlashMsg(''), 3500) }
+  function flash(msg: string) {
+    if (flashTimer.current) clearTimeout(flashTimer.current)
+    setFlashMsg(msg)
+    flashTimer.current = setTimeout(() => setFlashMsg(''), 3500)
+  }
+
+  useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current) }, [])
 
   async function load() {
-    const [{ data: cats }, { data: evs }, { data: gm }, { data: parts }, { data: resultData }, { data: stg }] = await Promise.all([
+    const [
+      { data: cats, error: catsErr },
+      { data: evs,  error: evsErr  },
+      { data: gm,   error: gmErr   },
+      { data: mm,   error: mmErr   },
+      { data: parts,error: partsErr},
+      { data: resultData, error: resErr },
+      { data: stg,  error: stgErr  },
+    ] = await Promise.all([
       supabase.from('categories').select('*').order('display_order'),
       supabase.from('events').select('*').order('name'),
       supabase.from('guest_marks').select('*'),
+      supabase.from('marks').select('*'),
       supabase.from('participants').select('slot_number, event_id, entry_index, member_index, participant_name').order('entry_index').order('member_index'),
       supabase.from('results').select('*'),
       supabase.from('settings').select('*').single(),
     ])
+    const firstErr = catsErr ?? evsErr ?? gmErr ?? mmErr ?? partsErr ?? resErr ?? stgErr
+    if (firstErr) { flash(`❌ Failed to load: ${firstErr.message}`); return }
     setCategories(cats ?? [])
     setEvents((evs as Event[]) ?? [])
     if (cats?.[0]) setSelectedCat(prev => prev || cats[0].id)
     setGuestMarks(gm ?? [])
+    setManualMarks(mm ?? [])
     setParticipants(parts ?? [])
     const res: Record<string, any> = {}
     ;(resultData ?? []).forEach((r: any) => { res[r.event_id] = r })
@@ -81,10 +101,11 @@ export default function AdminGuestMarksPage() {
 
   async function savePoints() {
     setSavingPts(true)
-    await supabase.from('settings').update({ points_1st: draftPts.p1, points_2nd: draftPts.p2, points_3rd: draftPts.p3 })
+    const { error } = await supabase.from('settings').update({ points_1st: draftPts.p1, points_2nd: draftPts.p2, points_3rd: draftPts.p3 }).eq('id', 1)
+    setSavingPts(false)
+    if (error) { flash(`❌ ${error.message}`); return }
     setShowPtsPanel(false)
     flash(`Points updated: 1st=${draftPts.p1} · 2nd=${draftPts.p2} · 3rd=${draftPts.p3}`)
-    setSavingPts(false)
   }
 
   // namesByEvent[eventId][slot_entry] = "names joined"
@@ -151,20 +172,23 @@ export default function AdminGuestMarksPage() {
     return entries.length > 0 && entries.every(({ slot, entry }) => isEntryLocked(eventId, slot, entry))
   }
 
-  async function setEntryLock(eventId: string, slot: number, entry: number, locked: boolean) {
+  async function setEntryLock(eventId: string, slot: number, entry: number, locked: boolean): Promise<string | null> {
     const rows = rowsFor(eventId, slot, entry)
     for (const r of rows) {
-      await supabase.from('guest_marks').upsert({
+      const { error } = await supabase.from('guest_marks').upsert({
         event_id: eventId, judge_number: r.judge_number, judge_name: r.judge_name,
         slot_number: slot, entry_index: entry,
         criteria_scores: r.criteria_scores, judge_total: r.judge_total, locked,
-      }, { onConflict: ['event_id', 'judge_number', 'slot_number', 'entry_index'] })
+      }, { onConflict: 'event_id,judge_number,slot_number,entry_index' })
+      if (error) return error.message
     }
+    return null
   }
 
   async function lockEntry(eventId: string, slot: number, entry: number) {
     setSaving(true)
-    await setEntryLock(eventId, slot, entry, true)
+    const err = await setEntryLock(eventId, slot, entry, true)
+    if (err) { flash(`❌ ${err}`); setSaving(false); return }
     await load()
     flash(`Slot ${slot} locked ✓`)
     setSaving(false)
@@ -172,7 +196,8 @@ export default function AdminGuestMarksPage() {
 
   async function unlockEntry(eventId: string, slot: number, entry: number) {
     setSaving(true)
-    await setEntryLock(eventId, slot, entry, false)
+    const err = await setEntryLock(eventId, slot, entry, false)
+    if (err) { flash(`❌ ${err}`); setSaving(false); return }
     await load()
     flash(`Slot ${slot} unlocked ✓`)
     setSaving(false)
@@ -181,7 +206,8 @@ export default function AdminGuestMarksPage() {
   async function lockAll(eventId: string) {
     setSaving(true)
     for (const { slot, entry } of entriesForEvent(eventId)) {
-      await setEntryLock(eventId, slot, entry, true)
+      const err = await setEntryLock(eventId, slot, entry, true)
+      if (err) { flash(`❌ ${err}`); setSaving(false); return }
     }
     await load()
     flash('All marks locked ✓')
@@ -192,9 +218,11 @@ export default function AdminGuestMarksPage() {
   async function fullUnlock(eventId: string) {
     setSaving(true)
     for (const { slot, entry } of entriesForEvent(eventId)) {
-      await setEntryLock(eventId, slot, entry, false)
+      const err = await setEntryLock(eventId, slot, entry, false)
+      if (err) { flash(`❌ ${err}`); setSaving(false); return }
     }
-    await supabase.from('results').delete().eq('event_id', eventId)
+    const { error: delErr } = await supabase.from('results').delete().eq('event_id', eventId)
+    if (delErr) { flash(`❌ ${delErr.message}`); setSaving(false); return }
     await load()
     flash('Fully unlocked ✓')
     setSaving(false)
@@ -226,7 +254,7 @@ export default function AdminGuestMarksPage() {
     setEditSaving(true)
     const { eventId, judgeNumber, judgeName: jName, slot, entry, scores } = editModal
     const judgeTotal = scores.reduce((a, b) => a + (Number(b) || 0), 0)
-    await supabase.from('guest_marks').upsert({
+    const { error } = await supabase.from('guest_marks').upsert({
       event_id: eventId,
       judge_number: judgeNumber,
       judge_name: jName,
@@ -235,22 +263,43 @@ export default function AdminGuestMarksPage() {
       criteria_scores: scores,
       judge_total: judgeTotal,
       locked: false,
-    }, { onConflict: ['event_id', 'judge_number', 'slot_number', 'entry_index'] })
+    }, { onConflict: 'event_id,judge_number,slot_number,entry_index' })
+    setEditSaving(false)
+    if (error) { flash(`❌ ${error.message}`); return }
     await load()
     flash('Marks updated ✓')
     setEditModal(null)
-    setEditSaving(false)
   }
 
   async function computeWinners(eventId: string) {
     setSaving(true)
-    const entries = entriesForEvent(eventId)
     type SE = { slot: number; entry: number; total: number; names: string }
-    const seList: SE[] = entries.map(({ slot, entry }) => ({
-      slot, entry,
-      total: avgTotal(eventId, slot, entry) ?? 0,
-      names: namesByEvent[eventId]?.[eKey(slot, entry)] ?? '',
-    }))
+    let seList: SE[]
+
+    const guestEntries = entriesForEvent(eventId)
+
+    if (guestEntries.length > 0) {
+      // Use guest marks (averaged across judges)
+      seList = guestEntries.map(({ slot, entry }) => ({
+        slot, entry,
+        total: avgTotal(eventId, slot, entry) ?? 0,
+        names: namesByEvent[eventId]?.[eKey(slot, entry)] ?? '',
+      }))
+    } else {
+      // Fall back to manual marks from the marks table
+      const eventManualMarks = manualMarks.filter(m => m.event_id === eventId)
+      if (eventManualMarks.length === 0) {
+        flash('No marks found — enter guest marks or manual marks first.')
+        setSaving(false)
+        return
+      }
+      seList = eventManualMarks.map((m: any) => ({
+        slot: m.slot_number,
+        entry: m.entry_index ?? 1,
+        total: Number(m.total) || 0,
+        names: namesByEvent[eventId]?.[eKey(m.slot_number, m.entry_index ?? 1)] ?? '',
+      }))
+    }
     seList.sort((a, b) => b.total - a.total)
     const groups: WinnerGroup[] = []
     let rank = 1, i = 0
@@ -259,17 +308,18 @@ export default function AdminGuestMarksPage() {
       groups.push({ rank, total: seList[i].total, entries: tied.map(x => ({ slot: x.slot, entry: x.entry, names: x.names })) })
       rank += tied.length; i += tied.length
     }
-    await supabase.from('results').upsert({
+    const { error: upsertErr } = await supabase.from('results').upsert({
       event_id: eventId,
       first_slot: groups[0]?.entries[0]?.slot ?? null,
       second_slot: groups[1]?.entries[0]?.slot ?? null,
       third_slot: groups[2]?.entries[0]?.slot ?? null,
       winners_json: JSON.stringify(groups),
       published: false,
-    }, { onConflict: ['event_id'] })
+    }, { onConflict: 'event_id' })
+    setSaving(false)
+    if (upsertErr) { flash(`❌ ${upsertErr.message}`); return }
     await load()
     flash('Winners computed from guest marks ✓')
-    setSaving(false)
     setComputeTarget(null)
   }
 
@@ -290,7 +340,7 @@ export default function AdminGuestMarksPage() {
       </div>
 
       {flashMsg && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-2.5 rounded-xl text-sm font-medium">{flashMsg}</div>
+        <div className={`px-4 py-2.5 rounded-xl text-sm font-medium ${flashMsg.startsWith('❌') ? 'bg-red-50 border border-red-100 text-red-600' : 'bg-green-50 border border-green-200 text-green-700'}`}>{flashMsg}</div>
       )}
 
       {showPtsPanel && (
@@ -324,6 +374,7 @@ export default function AdminGuestMarksPage() {
         const allLocked = allEntriesLocked(ev.id)
         const winnerGroups: WinnerGroup[] = result?.winners_json
           ? (() => { try { return JSON.parse(result.winners_json) } catch { return [] } })() : []
+        const hasManualMarks = manualMarks.some(m => m.event_id === ev.id)
 
         return (
           <div key={ev.id} className="card p-0 overflow-hidden">
@@ -339,6 +390,11 @@ export default function AdminGuestMarksPage() {
                     ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1"><Lock size={10} /> Finalized</span>
                     : <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1"><Lock size={10} /> Marks locked</span>
                 )}
+                {hasManualMarks && entries.length === 0 && (
+                  result
+                    ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1"><Lock size={10} /> Finalized</span>
+                    : <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1"><Pencil size={10} /> Manual marks</span>
+                )}
               </div>
               {isOpen ? <ChevronDown size={18} className="text-gray-400" /> : <ChevronRight size={18} className="text-gray-400" />}
             </div>
@@ -346,7 +402,22 @@ export default function AdminGuestMarksPage() {
             {isOpen && (
               <div className="border-t border-gray-100 px-5 py-4 space-y-4">
                 {entries.length === 0 ? (
-                  <div className="text-center text-gray-400 py-8 text-sm">No guest marks submitted for this event yet.</div>
+                  <div className="text-center text-gray-400 py-8 text-sm space-y-3">
+                    <p>No guest marks submitted for this event yet.</p>
+                    {hasManualMarks && !result && (
+                      <div className="flex flex-col items-center gap-2">
+                        <p className="text-purple-600 text-xs font-medium">Manual marks have been entered for this event.</p>
+                        <button onClick={() => setComputeTarget(ev.id)} disabled={saving} className="btn-primary flex items-center gap-2 text-sm">
+                          <Trophy size={14} /> Compute Winners from Manual Marks
+                        </button>
+                      </div>
+                    )}
+                    {result && hasManualMarks && entries.length === 0 && (
+                      <button onClick={() => requestFullUnlock(ev.id)} disabled={saving} className="btn-danger flex items-center gap-2 mx-auto text-sm">
+                        <Unlock size={14} /> Full Unlock
+                      </button>
+                    )}
+                  </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm border-collapse">

@@ -11,9 +11,11 @@ export default function AdminAnnouncementsPage() {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ title: '', message: '' })
   const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
 
   async function load() {
-    const { data } = await supabase.from('announcements').select('*').order('created_at', { ascending: false })
+    const { data, error } = await supabase.from('announcements').select('*').order('created_at', { ascending: false })
+    if (error) { setMessage(`❌ Failed to load announcements: ${error.message}`); return }
     setAnnouncements(data ?? [])
   }
 
@@ -22,16 +24,19 @@ export default function AdminAnnouncementsPage() {
   async function handlePost() {
     if (!form.title || !form.message) return
     setSaving(true)
-    await supabase.from('announcements').insert({ title: form.title, message: form.message })
+    setMessage('')
+    const { error } = await supabase.from('announcements').insert({ title: form.title, message: form.message })
+    setSaving(false)
+    if (error) { setMessage(`❌ ${error.message}`); return }
     setForm({ title: '', message: '' })
     setShowForm(false)
-    setSaving(false)
     await load()
   }
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this announcement?')) return
-    await supabase.from('announcements').delete().eq('id', id)
+    const { error } = await supabase.from('announcements').delete().eq('id', id)
+    if (error) { setMessage(`❌ ${error.message}`); return }
     await load()
   }
 
@@ -49,6 +54,12 @@ export default function AdminAnnouncementsPage() {
           <Plus size={16} /> New
         </button>
       </div>
+
+      {message && (
+        <div className={`px-4 py-2.5 rounded-xl text-sm font-medium ${message.startsWith('❌') ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-700 border border-green-100'}`}>
+          {message}
+        </div>
+      )}
 
       {/* Form */}
       {showForm && (

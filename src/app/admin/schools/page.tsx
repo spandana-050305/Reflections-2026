@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Plus, Trash2, X, Save, Shuffle, Copy, Check, Eye, EyeOff, KeyRound, FileDown } from 'lucide-react'
 import jsPDF from 'jspdf'
@@ -37,11 +37,15 @@ export default function AdminSchoolsPage() {
   const [shuffling, setShuffling] = useState(false)
   const [showShuffleWarning, setShowShuffleWarning] = useState(false)
   const [showAllCreds, setShowAllCreds] = useState(false)
+  const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => { if (msgTimer.current) clearTimeout(msgTimer.current) }, [])
 
   const schoolsOrdered = [...schools].sort((a, b) => (a.slot_number ?? 9999) - (b.slot_number ?? 9999))
 
   async function load() {
-    const { data } = await supabase.from('schools').select('*').order('slot_number')
+    const { data, error } = await supabase.from('schools').select('*').order('slot_number')
+    if (error) { showMsg(`❌ Failed to load schools: ${error.message}`, 'error'); return }
     setSchools(data ?? [])
   }
 
@@ -53,9 +57,10 @@ export default function AdminSchoolsPage() {
   }, [form.school_name])
 
   function showMsg(text: string, type: 'success' | 'error' = 'success') {
+    if (msgTimer.current) clearTimeout(msgTimer.current)
     setMessage(text)
     setMessageType(type)
-    setTimeout(() => setMessage(''), 4000)
+    msgTimer.current = setTimeout(() => setMessage(''), 4000)
   }
 
   function openCreateForm() {
@@ -78,28 +83,14 @@ export default function AdminSchoolsPage() {
     const password = previewPass
     const slotNum = form.slot_number ? +form.slot_number : null
 
-    const { data: authData, error: authErr } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { role: 'school', slot_number: slotNum } },
+    const res = await fetch('/api/admin/manage-school', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, schoolName: form.school_name.trim(), slotNumber: slotNum }),
     })
-
-    if (authErr) {
-      showMsg('Error creating account: ' + authErr.message, 'error')
-      setSaving(false)
-      return
-    }
-
-    const { error: dbErr } = await supabase.from('schools').insert({
-      user_id: authData.user?.id,
-      school_name: form.school_name.trim(),
-      slot_number: slotNum,
-      email,
-      password_plain: password,
-    })
-
-    if (dbErr) {
-      showMsg('Error saving school: ' + dbErr.message, 'error')
+    const json = await res.json()
+    if (!res.ok) {
+      showMsg('Error creating school: ' + (json.error ?? 'Unknown error'), 'error')
       setSaving(false)
       return
     }
@@ -113,11 +104,12 @@ export default function AdminSchoolsPage() {
 
   async function handleDelete(school: any) {
     if (!confirm(`Delete "${school.school_name}"? This will remove all their participant data.`)) return
-    if (school.slot_number != null) {
-      await supabase.from('schools').delete().eq('slot_number', school.slot_number)
-    } else {
-      await supabase.from('schools').delete().eq('user_id', school.user_id)
-    }
+    const res = await fetch('/api/admin/manage-school', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ schoolId: school.id, userId: school.user_id, slotNumber: school.slot_number }),
+    })
+    if (!res.ok) { showMsg(`❌ Delete failed (${res.status})`, 'error'); return }
     await load()
   }
 
@@ -142,17 +134,55 @@ export default function AdminSchoolsPage() {
     for (let i = 0; i < withSlots.length; i++) {
       const school = withSlots[i]
       const tempSlot = oldSlots[i] + 10000
-      await supabase.from('schools').update({ slot_number: tempSlot }).eq('id', school.id)
-      await supabase.from('participants').update({ slot_number: tempSlot }).eq('slot_number', oldSlots[i])
-      await supabase.from('marks').update({ slot_number: tempSlot }).eq('slot_number', oldSlots[i])
+      const results = await Promise.all([
+        supabase.from('schools').update({ slot_number: tempSlot }).eq('id', school.id),
+        supabase.from('participants').update({ slot_number: tempSlot }).eq('slot_number', oldSlots[i]),
+        supabase.from('marks').update({ slot_number: tempSlot }).eq('slot_number', oldSlots[i]),
+        supabase.from('guest_marks').update({ slot_number: tempSlot }).eq('slot_number', oldSlots[i]),
+      ])
+      const firstErr = results.find(r => r.error)?.error
+      if (firstErr) {
+        showMsg(`❌ Shuffle failed: ${firstErr.message}. Check your data — slots may be partially updated.`, 'error')
+        setShuffling(false)
+        await load()
+        return
+      }
     }
 
     for (let i = 0; i < withSlots.length; i++) {
       const school = withSlots[i]
       const tempSlot = oldSlots[i] + 10000
-      await supabase.from('schools').update({ slot_number: newSlots[i] }).eq('id', school.id)
-      await supabase.from('participants').update({ slot_number: newSlots[i] }).eq('slot_number', tempSlot)
-      await supabase.from('marks').update({ slot_number: newSlots[i] }).eq('slot_number', tempSlot)
+      const results = await Promise.all([
+        supabase.from('schools').update({ slot_number: newSlots[i] }).eq('id', school.id),
+        supabase.from('participants').update({ slot_number: newSlots[i] }).eq('slot_number', tempSlot),
+        supabase.from('marks').update({ slot_number: newSlots[i] }).eq('slot_number', tempSlot),
+        supabase.from('guest_marks').update({ slot_number: newSlots[i] }).eq('slot_number', tempSlot),
+      ])
+      const firstErr = results.find(r => r.error)?.error
+      if (firstErr) {
+        showMsg(`❌ Shuffle failed mid-way: ${firstErr.message}. Check your data — slots may be partially updated.`, 'error')
+        setShuffling(false)
+        await load()
+        return
+      }
+    }
+
+    // Update slot_number in each school's Auth user metadata so their portal reflects the new slot immediately
+    const metaUpdates = withSlots
+      .filter(s => s.user_id)
+      .map((school, i) => ({ userId: school.user_id, slotNumber: newSlots[i] }))
+    if (metaUpdates.length > 0) {
+      const metaRes = await fetch('/api/admin/update-slot-metadata', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates: metaUpdates }),
+      })
+      if (!metaRes.ok) {
+        showMsg('⚠️ Slots shuffled but metadata update failed — schools may need to re-login to see new slots.', 'error')
+        setShuffling(false)
+        await load()
+        return
+      }
     }
 
     await load()

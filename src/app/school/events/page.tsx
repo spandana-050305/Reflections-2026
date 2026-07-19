@@ -9,10 +9,12 @@ export const dynamic = 'force-dynamic'
 
 export default async function SchoolEventsPage() {
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user
   if (!user) redirect('/')
 
-  const slotNumber = user.user_metadata?.slot_number as number
+  const slotNumber = user.user_metadata?.slot_number as number | undefined
+  if (!slotNumber) redirect('/')
 
   const [
     { data: categories },
@@ -26,7 +28,7 @@ export default async function SchoolEventsPage() {
     supabase.from('settings').select('registration_open').single(),
   ])
 
-  const isOpen = settings?.registration_open ?? true
+  const isOpen = settings?.registration_open ?? false
   const filledEventIds = new Set((myParticipants ?? []).map((p: { event_id: string }) => p.event_id))
 
   const eventsByCategory: Record<string, Event[]> = {}
@@ -97,7 +99,7 @@ export default async function SchoolEventsPage() {
         )
       })}
 
-      {(categories as Category[] ?? []).length === 0 && (
+      {(events ?? []).length === 0 && (
         <div className="card text-center text-gray-400 py-12">No events published yet.</div>
       )}
     </div>
