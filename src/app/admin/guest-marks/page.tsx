@@ -141,7 +141,7 @@ export default function AdminGuestMarksPage() {
 
   async function savePoints() {
     setSavingPts(true)
-    const { error } = await supabase.from('settings').update({ points_1st: draftPts.p1, points_2nd: draftPts.p2, points_3rd: draftPts.p3 }).eq('id', 1)
+    const { error } = await supabase.from('settings').upsert({ id: 1, points_1st: draftPts.p1, points_2nd: draftPts.p2, points_3rd: draftPts.p3 }, { onConflict: 'id' })
     setSavingPts(false)
     if (error) { flash(`❌ ${error.message}`); return }
     setShowPtsPanel(false)

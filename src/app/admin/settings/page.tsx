@@ -84,11 +84,12 @@ export default function AdminSettingsPage() {
     if (!pwForm.password.trim()) { showPwMsg('Enter a password.', 'error'); return }
     if (!pwForm.a1.trim() || !pwForm.a2.trim()) { showPwMsg('Answer both security questions.', 'error'); return }
     setPwSaving(true)
-    const { error } = await supabase.from('settings').update({
+    const { error } = await supabase.from('settings').upsert({
+      id: 1,
       unlock_password: pwForm.password.trim(),
       security_answer_1: pwForm.a1.trim(),
       security_answer_2: pwForm.a2.trim(),
-    }).eq('id', 1)
+    }, { onConflict: 'id' })
     setPwSaving(false)
     if (error) { showPwMsg(`❌ ${error.message}`, 'error'); return }
     setHasUnlockPassword(true)
@@ -104,7 +105,7 @@ export default function AdminSettingsPage() {
     }
     if (!resetForm.password.trim()) { showPwMsg('Enter a new password.', 'error'); return }
     setPwSaving(true)
-    const { error } = await supabase.from('settings').update({ unlock_password: resetForm.password.trim() }).eq('id', 1)
+    const { error } = await supabase.from('settings').upsert({ id: 1, unlock_password: resetForm.password.trim() }, { onConflict: 'id' })
     setPwSaving(false)
     if (error) { showPwMsg(`❌ ${error.message}`, 'error'); return }
     setResetForm({ a1: '', a2: '', password: '' })
@@ -122,7 +123,7 @@ export default function AdminSettingsPage() {
     const action = newValue ? 'open' : 'close'
     if (!confirm(`Are you sure you want to ${action} registration? ${!newValue ? 'Schools will no longer be able to edit participants.' : 'Schools will be able to edit their participants again.'}`)) return
     setSaving(true)
-    const { error } = await supabase.from('settings').update({ registration_open: newValue }).eq('id', 1)
+    const { error } = await supabase.from('settings').upsert({ id: 1, registration_open: newValue }, { onConflict: 'id' })
     setSaving(false)
     if (error) { setMessage(`❌ ${error.message}`); if (regMsgTimer.current) clearTimeout(regMsgTimer.current); regMsgTimer.current = setTimeout(() => setMessage(''), 4000); return }
     setRegistrationOpen(newValue)

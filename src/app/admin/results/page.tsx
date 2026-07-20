@@ -82,14 +82,14 @@ export default function AdminResultsPage() {
       rank += tied.length; i += tied.length
     }
 
-    const { error } = await supabase.from('results').insert({
+    const { error } = await supabase.from('results').upsert({
       event_id: eventId,
       first_slot: groups[0]?.entries[0]?.slot ?? null,
       second_slot: groups[1]?.entries[0]?.slot ?? null,
       third_slot: groups[2]?.entries[0]?.slot ?? null,
       winners_json: JSON.stringify(groups),
       published: false,
-    })
+    }, { onConflict: 'event_id' })
     setComputing(null)
     if (error) { showMessage(`❌ ${error.message}`); return }
     showMessage('Winners computed ✓')
