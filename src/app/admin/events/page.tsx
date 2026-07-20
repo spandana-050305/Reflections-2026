@@ -7,6 +7,7 @@ import type { Category } from '@/lib/types'
 import { parseAssignedMembers } from '@/lib/types'
 
 const DEFAULT_CRITERIA = ['', '', '', '']
+const CATEGORY_OPTIONS = ['A', 'B', 'C', 'D']
 
 const EMPTY_FORM = {
   name: '',
@@ -17,9 +18,7 @@ const EMPTY_FORM = {
   event_date: '',
   event_time: '',
   venue: '',
-  member1: '',
-  member2: '',
-  member3: '',
+  members: [''] as string[],
   criteria: DEFAULT_CRITERIA as string[],
   rules: '',
 }
@@ -34,6 +33,10 @@ export default function AdminEventsPage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
 
+  // Category management state
+  const [newCatName, setNewCatName] = useState('A')
+  const [addingCat, setAddingCat] = useState(false)
+
   async function load() {
     const [{ data: cats, error: catsErr }, { data: evs, error: evsErr }] = await Promise.all([
       supabase.from('categories').select('*').order('display_order'),
@@ -47,9 +50,29 @@ export default function AdminEventsPage() {
 
   useEffect(() => { load() }, [])
 
+  async function handleAddCategory() {
+    const name = newCatName.trim()
+    if (!name) return
+    setAddingCat(true)
+    const displayOrder = CATEGORY_OPTIONS.indexOf(name) + 1
+    const { error } = await supabase.from('categories').insert({ name, display_order: displayOrder })
+    if (error) { setMessage(`❌ ${error.message}`); setAddingCat(false); return }
+    await load()
+    setAddingCat(false)
+    setMessage(`Category ${name} created!`)
+  }
+
+  async function handleDeleteCategory(id: string, name: string) {
+    if (!confirm(`Delete category "${name}"? All events in this category will also be deleted.`)) return
+    const { error } = await supabase.from('categories').delete().eq('id', id)
+    if (error) { setMessage(`❌ ${error.message}`); return }
+    await load()
+  }
+
   function startEdit(ev: any) {
     setEditId(ev.id)
-    const members: string[] = parseAssignedMembers(ev.assigned_members)
+    const parsedMembers: string[] = parseAssignedMembers(ev.assigned_members)
+    const members = parsedMembers.length > 0 ? parsedMembers : ['']
     const criteria: string[] =
       ev.criteria_names && ev.criteria_names.length > 0
         ? ev.criteria_names
@@ -63,9 +86,7 @@ export default function AdminEventsPage() {
       event_date: ev.event_date ?? '',
       event_time: ev.event_time ?? '',
       venue: ev.venue ?? '',
-      member1: members[0] ?? '',
-      member2: members[1] ?? '',
-      member3: members[2] ?? '',
+      members,
       criteria,
       rules: ev.rules ?? '',
     })
@@ -79,13 +100,31 @@ export default function AdminEventsPage() {
     setMessage('')
   }
 
+  function addMember() {
+    if (form.members.length >= 5) return
+    setForm({ ...form, members: [...form.members, ''] })
+  }
+
+  function removeMember(i: number) {
+    if (form.members.length <= 1) {
+      setForm({ ...form, members: [''] })
+      return
+    }
+    setForm({ ...form, members: form.members.filter((_, j) => j !== i) })
+  }
+
+  function updateMember(i: number, val: string) {
+    const next = [...form.members]
+    next[i] = val
+    setForm({ ...form, members: next })
+  }
+
   async function handleSave() {
     if (!form.name || !form.category_id) { setMessage('Name and category are required.'); return }
     setSaving(true)
     setMessage('')
 
-    const assignedMembers = [form.member1, form.member2, form.member3]
-      .map(m => m.trim()).filter(Boolean)
+    const assignedMembers = form.members.map(m => m.trim()).filter(Boolean)
 
     const payload: any = {
       name: form.name,
@@ -131,6 +170,10 @@ export default function AdminEventsPage() {
     eventsByCategory[cn].push(ev)
   })
 
+  // Which category names are already in the DB?
+  const existingCatNames = new Set(categories.map(c => c.name))
+  const availableCatOptions = CATEGORY_OPTIONS.filter(o => !existingCatNames.has(o))
+
   return (
     <div className="max-w-4xl mx-auto space-y-5">
       <div className="flex items-center justify-between">
@@ -149,7 +192,53 @@ export default function AdminEventsPage() {
         </div>
       )}
 
-      {/* Form */}
+      {/* Category Management */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-gray-800">Categories</h3>
+        </div>
+
+        {/* Existing categories */}
+        {categories.length > 0 ? (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {categories.map(cat => (
+              <div key={cat.id} className="flex items-center gap-1.5 bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-full text-sm font-medium text-brand-700">
+                Category {cat.name}
+                <button
+                  onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                  className="text-brand-400 hover:text-red-500 transition-colors"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400 mb-4">No categories yet. Add one below.</p>
+        )}
+
+        {/* Add category */}
+        {availableCatOptions.length > 0 ? (
+          <div className="flex items-center gap-3">
+            <select
+              className="input w-32"
+              value={newCatName}
+              onChange={e => setNewCatName(e.target.value)}
+            >
+              {availableCatOptions.map(o => (
+                <option key={o} value={o}>Category {o}</option>
+              ))}
+            </select>
+            <button onClick={handleAddCategory} disabled={addingCat} className="btn-primary flex items-center gap-2 py-2">
+              <Plus size={14} /> {addingCat ? 'Adding…' : 'Add Category'}
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-400">All categories (A–D) have been added.</p>
+        )}
+      </div>
+
+      {/* Event Form */}
       {showForm && (
         <div className="card border border-brand-100 bg-brand-50/30">
           <div className="flex items-center justify-between mb-4">
@@ -165,7 +254,7 @@ export default function AdminEventsPage() {
               <label className="block text-xs font-medium text-gray-600 mb-1">Category *</label>
               <select className="input" value={form.category_id} onChange={e => setForm({ ...form, category_id: e.target.value })}>
                 <option value="">Select category</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {categories.map(c => <option key={c.id} value={c.id}>Category {c.name}</option>)}
               </select>
             </div>
             <div>
@@ -246,14 +335,36 @@ export default function AdminEventsPage() {
               <input className="input" value={form.venue} onChange={e => setForm({ ...form, venue: e.target.value })} placeholder="e.g. Main Hall" />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-xs font-medium text-gray-600 mb-2">Assigned Members <span className="text-gray-400 font-normal">(up to 3)</span></label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <input className="input" placeholder="Member 1 name" value={form.member1}
-                  onChange={e => setForm({ ...form, member1: e.target.value })} />
-                <input className="input" placeholder="Member 2 name" value={form.member2}
-                  onChange={e => setForm({ ...form, member2: e.target.value })} />
-                <input className="input" placeholder="Member 3 name" value={form.member3}
-                  onChange={e => setForm({ ...form, member3: e.target.value })} />
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-gray-600">
+                  Assigned Members <span className="text-gray-400 font-normal">(all optional)</span>
+                </label>
+                {form.members.length < 5 && (
+                  <button type="button" onClick={addMember} className="text-xs text-brand-600 hover:underline flex items-center gap-1">
+                    <Plus size={12} /> Add member
+                  </button>
+                )}
+              </div>
+              <div className="space-y-2">
+                {form.members.map((m, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <input
+                      className="input flex-1"
+                      placeholder={`Member ${i + 1} name (optional)`}
+                      value={m}
+                      onChange={e => updateMember(i, e.target.value)}
+                    />
+                    {form.members.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeMember(i)}
+                        className="text-red-400 hover:text-red-600 shrink-0"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -272,31 +383,31 @@ export default function AdminEventsPage() {
         const catEvents = eventsByCategory[cat.id] ?? []
         if (catEvents.length === 0) return null
         return (
-        <div key={cat.id} className="card">
-          <h3 className="text-base font-semibold text-brand-700 mb-3 pb-2 border-b border-gray-100">{cat.name}</h3>
-          <div className="space-y-2">
-            {catEvents.map(ev => (
-              <div key={ev.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-gray-50">
-                <div>
-                  <p className="font-medium text-sm text-gray-800">{ev.name}</p>
-                  <div className="flex gap-3 mt-1 text-xs text-gray-400 flex-wrap">
-                    <span className={`font-medium px-2 py-0.5 rounded-full ${ev.is_team_event ? 'bg-violet-100 text-violet-700' : 'bg-blue-50 text-blue-600'}`}>
-                      {ev.is_team_event ? `Team Evaluation (${ev.team_size} members)` : 'Individual Evaluation'}
-                    </span>
-                    {ev.venue && <span>📍 {ev.venue}</span>}
-                    {ev.event_date && <span>📅 {ev.event_date}</span>}
-                    {ev.max_entries > 1 && <span>Max {ev.max_entries} entries</span>}
-                    <span>{ev.criteria_names?.length ?? ev.criteria_count ?? 4} criteria</span>
+          <div key={cat.id} className="card">
+            <h3 className="text-base font-semibold text-brand-700 mb-3 pb-2 border-b border-gray-100">Category {cat.name}</h3>
+            <div className="space-y-2">
+              {catEvents.map(ev => (
+                <div key={ev.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-gray-50">
+                  <div>
+                    <p className="font-medium text-sm text-gray-800">{ev.name}</p>
+                    <div className="flex gap-3 mt-1 text-xs text-gray-400 flex-wrap">
+                      <span className={`font-medium px-2 py-0.5 rounded-full ${ev.is_team_event ? 'bg-violet-100 text-violet-700' : 'bg-blue-50 text-blue-600'}`}>
+                        {ev.is_team_event ? `Team Evaluation (${ev.team_size} members)` : 'Individual Evaluation'}
+                      </span>
+                      {ev.venue && <span>📍 {ev.venue}</span>}
+                      {ev.event_date && <span>📅 {ev.event_date}</span>}
+                      {ev.max_entries > 1 && <span>Max {ev.max_entries} entries</span>}
+                      <span>{ev.criteria_names?.length ?? ev.criteria_count ?? 4} criteria</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={() => startEdit(ev)} className="btn-secondary text-xs px-3 py-1.5">Edit</button>
+                    <button onClick={() => handleDelete(ev.id)} className="btn-danger text-xs px-3 py-1.5">Delete</button>
                   </div>
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  <button onClick={() => startEdit(ev)} className="btn-secondary text-xs px-3 py-1.5">Edit</button>
-                  <button onClick={() => handleDelete(ev.id)} className="btn-danger text-xs px-3 py-1.5">Delete</button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
         )
       })}
     </div>
