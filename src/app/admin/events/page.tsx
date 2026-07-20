@@ -7,7 +7,6 @@ import type { Category } from '@/lib/types'
 import { parseAssignedMembers } from '@/lib/types'
 
 const DEFAULT_CRITERIA = ['', '', '', '']
-const CATEGORY_OPTIONS = ['A', 'B', 'C', 'D']
 
 const EMPTY_FORM = {
   name: '',
@@ -33,10 +32,6 @@ export default function AdminEventsPage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
 
-  // Category management state
-  const [newCatName, setNewCatName] = useState('A')
-  const [addingCat, setAddingCat] = useState(false)
-
   async function load() {
     const [{ data: cats, error: catsErr }, { data: evs, error: evsErr }] = await Promise.all([
       supabase.from('categories').select('*').order('display_order'),
@@ -49,25 +44,6 @@ export default function AdminEventsPage() {
   }
 
   useEffect(() => { load() }, [])
-
-  async function handleAddCategory() {
-    const name = newCatName.trim()
-    if (!name) return
-    setAddingCat(true)
-    const displayOrder = CATEGORY_OPTIONS.indexOf(name) + 1
-    const { error } = await supabase.from('categories').insert({ name, display_order: displayOrder })
-    if (error) { setMessage(`❌ ${error.message}`); setAddingCat(false); return }
-    await load()
-    setAddingCat(false)
-    setMessage(`Category ${name} created!`)
-  }
-
-  async function handleDeleteCategory(id: string, name: string) {
-    if (!confirm(`Delete category "${name}"? All events in this category will also be deleted.`)) return
-    const { error } = await supabase.from('categories').delete().eq('id', id)
-    if (error) { setMessage(`❌ ${error.message}`); return }
-    await load()
-  }
 
   function startEdit(ev: any) {
     setEditId(ev.id)
@@ -170,10 +146,6 @@ export default function AdminEventsPage() {
     eventsByCategory[cn].push(ev)
   })
 
-  // Which category names are already in the DB?
-  const existingCatNames = new Set(categories.map(c => c.name))
-  const availableCatOptions = CATEGORY_OPTIONS.filter(o => !existingCatNames.has(o))
-
   return (
     <div className="max-w-4xl mx-auto space-y-5">
       <div className="flex items-center justify-between">
@@ -191,52 +163,6 @@ export default function AdminEventsPage() {
           {message}
         </div>
       )}
-
-      {/* Category Management */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-800">Categories</h3>
-        </div>
-
-        {/* Existing categories */}
-        {categories.length > 0 ? (
-          <div className="flex flex-wrap gap-2 mb-4">
-            {categories.map(cat => (
-              <div key={cat.id} className="flex items-center gap-1.5 bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-full text-sm font-medium text-brand-700">
-                Category {cat.name}
-                <button
-                  onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                  className="text-brand-400 hover:text-red-500 transition-colors"
-                >
-                  <X size={13} />
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-gray-400 mb-4">No categories yet. Add one below.</p>
-        )}
-
-        {/* Add category */}
-        {availableCatOptions.length > 0 ? (
-          <div className="flex items-center gap-3">
-            <select
-              className="input w-32"
-              value={newCatName}
-              onChange={e => setNewCatName(e.target.value)}
-            >
-              {availableCatOptions.map(o => (
-                <option key={o} value={o}>Category {o}</option>
-              ))}
-            </select>
-            <button onClick={handleAddCategory} disabled={addingCat} className="btn-primary flex items-center gap-2 py-2">
-              <Plus size={14} /> {addingCat ? 'Adding…' : 'Add Category'}
-            </button>
-          </div>
-        ) : (
-          <p className="text-xs text-gray-400">All categories (A–D) have been added.</p>
-        )}
-      </div>
 
       {/* Event Form */}
       {showForm && (
