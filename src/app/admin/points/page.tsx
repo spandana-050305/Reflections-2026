@@ -29,7 +29,7 @@ export default function AdminPointsPage() {
       supabase.from('schools').select('slot_number, school_name').order('slot_number'),
       supabase.from('categories').select('*').order('display_order'),
       supabase.from('events').select('id, category_id, name'),
-      supabase.from('settings').select('*').single(),
+      supabase.from('settings').select('*').maybeSingle(),
     ])
     const firstErr = resErr ?? scErr ?? catsErr ?? evsErr ?? stgErr
     if (firstErr) { setLoadError(`❌ Failed to load: ${firstErr.message}`); return }

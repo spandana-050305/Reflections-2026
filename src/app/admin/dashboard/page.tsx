@@ -20,7 +20,7 @@ export default async function AdminDashboard() {
     supabase.from('events').select('id, name').order('name'),
     supabase.from('participants').select('slot_number, event_id'),
     supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(5),
-    supabase.from('settings').select('registration_open').single(),
+    supabase.from('settings').select('registration_open').maybeSingle(),
   ])
 
   const totalEvents = events?.length ?? 0

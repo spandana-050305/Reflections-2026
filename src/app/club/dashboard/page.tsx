@@ -15,7 +15,7 @@ export default async function ClubDashboard() {
     { count: totalEvents },
   ] = await Promise.all([
     supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(5),
-    supabase.from('settings').select('registration_open').single(),
+    supabase.from('settings').select('registration_open').maybeSingle(),
     supabase.from('participants').select('*', { count: 'exact', head: true }),
     supabase.from('events').select('*', { count: 'exact', head: true }),
   ])

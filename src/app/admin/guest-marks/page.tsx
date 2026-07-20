@@ -73,7 +73,7 @@ export default function AdminGuestMarksPage() {
       supabase.from('categories').select('*').order('display_order'),
       supabase.from('events').select('*').order('name'),
       supabase.from('results').select('*'),
-      supabase.from('settings').select('*').single(),
+      supabase.from('settings').select('*').maybeSingle(),
     ])
     const firstErr = catsErr ?? evsErr ?? resErr ?? stgErr
     if (firstErr) { flash(`❌ Failed to load: ${firstErr.message}`); return null }

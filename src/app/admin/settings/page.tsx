@@ -66,7 +66,7 @@ export default function AdminSettingsPage() {
 
   useEffect(() => {
     async function loadSettings() {
-      const { data, error } = await supabase.from('settings').select('*').single()
+      const { data, error } = await supabase.from('settings').select('*').maybeSingle()
       if (error) {
         setMessage(`❌ Failed to load settings: ${error.message}`)
       } else if (data) {

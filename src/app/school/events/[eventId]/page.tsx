@@ -55,7 +55,7 @@ export default function EventDetailPage() {
           .eq('slot_number', slot)
           .order('entry_index')
           .order('member_index'),
-        supabase.from('settings').select('registration_open').single(),
+        supabase.from('settings').select('registration_open').maybeSingle(),
       ])
 
       const loadErr = evErr ?? partErr ?? settErr

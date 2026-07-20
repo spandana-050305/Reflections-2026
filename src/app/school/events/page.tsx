@@ -25,7 +25,7 @@ export default async function SchoolEventsPage() {
     supabase.from('categories').select('*').order('display_order'),
     supabase.from('events').select('*, categories(name)').order('name'),
     supabase.from('participants').select('event_id').eq('slot_number', slotNumber),
-    supabase.from('settings').select('registration_open').single(),
+    supabase.from('settings').select('registration_open').maybeSingle(),
   ])
 
   const isOpen = settings?.registration_open ?? false

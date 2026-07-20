@@ -24,7 +24,7 @@ export default async function SchoolDashboard() {
     supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(5),
     supabase.from('events').select('id'),
     supabase.from('participants').select('event_id').eq('slot_number', slotNumber),
-    supabase.from('settings').select('registration_open').single(),
+    supabase.from('settings').select('registration_open').maybeSingle(),
     supabase.from('schools').select('school_name').eq('slot_number', slotNumber).single(),
   ])
 

@@ -54,10 +54,10 @@ export default function AdminResultsPage() {
       supabase.from('events').select('*').order('name'),
       supabase.from('schools').select('slot_number, school_name').order('slot_number'),
       supabase.from('results').select('*'),
-      supabase.from('settings').select('points_1st, points_2nd, points_3rd').single(),
+      supabase.from('settings').select('points_1st, points_2nd, points_3rd').maybeSingle(),
       supabase.from('marks').select('event_id, slot_number, entry_index, total'),
     ])
-    const firstErr = catsErr ?? evsErr ?? scErr ?? resErr ?? stgErr ?? mkErr
+    const firstErr = catsErr ?? evsErr ?? scErr ?? resErr ?? mkErr
     if (firstErr) { showMessage(`❌ Failed to load: ${firstErr.message}`); return }
     setCategories(cats ?? [])
     setEvents(evs ?? [])
