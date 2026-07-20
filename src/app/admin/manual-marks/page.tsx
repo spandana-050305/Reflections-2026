@@ -108,9 +108,11 @@ export default function AdminManualMarksPage() {
       return
     }
 
-    const { error } = await supabase.from('marks').upsert(rows, {
-      onConflict: 'slot_number,event_id,entry_index',
-    })
+    // Delete existing marks for this event, then insert fresh
+    const { error: delErr } = await supabase.from('marks').delete().eq('event_id', selectedEvent.id)
+    if (delErr) { showFlash('Error saving: ' + delErr.message); setSaving(false); return }
+
+    const { error } = await supabase.from('marks').insert(rows)
 
     if (error) {
       showFlash('Error saving: ' + error.message)

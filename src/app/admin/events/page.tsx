@@ -39,7 +39,19 @@ export default function AdminEventsPage() {
     ])
     const firstErr = catsErr ?? evsErr
     if (firstErr) { setMessage(`❌ Failed to load: ${firstErr.message}`); return }
-    setCategories(cats ?? [])
+
+    // Auto-create any missing A/B/C/D categories
+    const existing = new Set((cats ?? []).map((c: any) => c.name))
+    const missing = ['A', 'B', 'C', 'D'].filter(n => !existing.has(n))
+    if (missing.length > 0) {
+      await supabase.from('categories').insert(
+        missing.map((n, i) => ({ name: n, display_order: ['A','B','C','D'].indexOf(n) + 1 }))
+      )
+      const { data: fresh } = await supabase.from('categories').select('*').order('display_order')
+      setCategories(fresh ?? [])
+    } else {
+      setCategories(cats ?? [])
+    }
     setEvents(evs ?? [])
   }
 
