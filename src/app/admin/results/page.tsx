@@ -26,6 +26,8 @@ export default function AdminResultsPage() {
   const [events, setEvents] = useState<Event[]>([])
   const [schools, setSchools] = useState<any[]>([])
   const [results, setResults] = useState<any[]>([])
+  const [manualMarks, setManualMarks] = useState<any[]>([])
+  const [computing, setComputing] = useState<string | null>(null)
   const [selectedCat, setSelectedCat] = useState('')
   const [message, setMessage] = useState('')
   const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -46,21 +48,52 @@ export default function AdminResultsPage() {
       { data: sc,   error: scErr   },
       { data: res,  error: resErr  },
       { data: stg,  error: stgErr  },
+      { data: mk,   error: mkErr   },
     ] = await Promise.all([
       supabase.from('categories').select('*').order('display_order'),
       supabase.from('events').select('*').order('name'),
       supabase.from('schools').select('slot_number, school_name').order('slot_number'),
       supabase.from('results').select('*'),
       supabase.from('settings').select('points_1st, points_2nd, points_3rd').single(),
+      supabase.from('marks').select('event_id, slot_number, entry_index, total'),
     ])
-    const firstErr = catsErr ?? evsErr ?? scErr ?? resErr ?? stgErr
+    const firstErr = catsErr ?? evsErr ?? scErr ?? resErr ?? stgErr ?? mkErr
     if (firstErr) { showMessage(`❌ Failed to load: ${firstErr.message}`); return }
     setCategories(cats ?? [])
     setEvents(evs ?? [])
     setSchools(sc ?? [])
     setResults(res ?? [])
+    setManualMarks(mk ?? [])
     if (stg) setRankPts({ 1: stg.points_1st ?? 15, 2: stg.points_2nd ?? 10, 3: stg.points_3rd ?? 5 })
     if (cats?.[0]) setSelectedCat(prev => prev || cats[0].id)
+  }
+
+  async function computeWinners(eventId: string) {
+    setComputing(eventId)
+    const eventMarks = manualMarks.filter(m => m.event_id === eventId)
+    if (eventMarks.length === 0) { showMessage('❌ No marks found for this event.'); setComputing(null); return }
+
+    const sorted = [...eventMarks].sort((a, b) => Number(b.total) - Number(a.total))
+    const groups: { rank: number; total: number; entries: { slot: number; entry: number; names: string }[] }[] = []
+    let rank = 1, i = 0
+    while (i < sorted.length && groups.length < 3) {
+      const tied = sorted.filter(x => x.total === sorted[i].total)
+      groups.push({ rank, total: Number(sorted[i].total), entries: tied.map(x => ({ slot: x.slot_number, entry: x.entry_index ?? 1, names: '' })) })
+      rank += tied.length; i += tied.length
+    }
+
+    const { error } = await supabase.from('results').insert({
+      event_id: eventId,
+      first_slot: groups[0]?.entries[0]?.slot ?? null,
+      second_slot: groups[1]?.entries[0]?.slot ?? null,
+      third_slot: groups[2]?.entries[0]?.slot ?? null,
+      winners_json: JSON.stringify(groups),
+      published: false,
+    })
+    setComputing(null)
+    if (error) { showMessage(`❌ ${error.message}`); return }
+    showMessage('Winners computed ✓')
+    await load()
   }
 
   useEffect(() => { load() }, [])
@@ -192,9 +225,18 @@ export default function AdminResultsPage() {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-400">
-                      Finalize marks in the Marks section to compute winners.
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <p className="text-sm text-gray-400">No result yet.</p>
+                      {manualMarks.some(m => m.event_id === ev.id) && (
+                        <button
+                          onClick={() => computeWinners(ev.id)}
+                          disabled={computing === ev.id}
+                          className="btn-primary text-xs px-3 py-1.5"
+                        >
+                          {computing === ev.id ? 'Computing…' : 'Compute Winners'}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
 
