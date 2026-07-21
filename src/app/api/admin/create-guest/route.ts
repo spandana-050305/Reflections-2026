@@ -86,8 +86,9 @@ export async function DELETE(req: NextRequest) {
   const admin = adminClient()
 
   // Find the auth user by email and delete them
-  const { data: { users } } = await admin.auth.admin.listUsers()
-  const authUser = users.find(u => u.email === email)
+  const { data: listData, error: listErr } = await admin.auth.admin.listUsers()
+  if (listErr) return NextResponse.json({ error: listErr.message }, { status: 500 })
+  const authUser = listData.users.find((u: any) => u.email === email)
   if (authUser) {
     await admin.auth.admin.deleteUser(authUser.id)
   }

@@ -9,8 +9,7 @@ import NavLink from '@/components/layout/NavLink'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  const user = session?.user
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
   if (user.user_metadata?.role !== 'final_year') redirect('/login')
 

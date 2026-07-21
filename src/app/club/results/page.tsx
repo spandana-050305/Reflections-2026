@@ -26,8 +26,8 @@ function parseWinners(r: any): WinnerGroup[] {
 
 export default async function ClubResultsPage() {
   const supabase = createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session?.user) redirect('/login')
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const { data: results } = await supabase
     .from('results')

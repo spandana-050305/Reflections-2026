@@ -41,8 +41,9 @@ export async function DELETE(req: NextRequest) {
   await admin.from('club_accounts').delete().eq('id', accountId)
 
   // Find and delete the Supabase Auth user by email
-  const { data: { users } } = await admin.auth.admin.listUsers()
-  const authUser = users.find(u => u.email === email)
+  const { data: listData, error: listErr } = await admin.auth.admin.listUsers()
+  if (listErr) return NextResponse.json({ error: listErr.message }, { status: 500 })
+  const authUser = listData.users.find((u: any) => u.email === email)
   if (authUser) await admin.auth.admin.deleteUser(authUser.id)
 
   return NextResponse.json({ ok: true })

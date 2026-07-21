@@ -7,8 +7,7 @@ import type { Announcement } from '@/lib/types'
 
 export default async function SchoolDashboard() {
   const supabase = createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  const user = session?.user
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const slotNumber = user.user_metadata?.slot_number as number | undefined
@@ -25,7 +24,7 @@ export default async function SchoolDashboard() {
     supabase.from('events').select('id'),
     supabase.from('participants').select('event_id').eq('slot_number', slotNumber),
     supabase.from('settings').select('registration_open').maybeSingle(),
-    supabase.from('schools').select('school_name').eq('slot_number', slotNumber).single(),
+    supabase.from('schools').select('school_name').eq('slot_number', slotNumber).maybeSingle(),
   ])
 
   const schoolName = schoolRow?.school_name ?? `Slot ${slotNumber}`

@@ -117,15 +117,15 @@ export default function AdminSchoolsPage() {
     setShowShuffleWarning(false)
     setShuffling(true)
 
-    // Clear computed results first — slot numbers in results would point to wrong schools after shuffle
-    await supabase.from('results').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-
     const withSlots = schools.filter(s => s.slot_number != null)
     if (withSlots.length < 2) {
       showMsg('Need at least 2 schools with slot numbers to shuffle.', 'error')
       setShuffling(false)
       return
     }
+
+    // Clear computed results first — slot numbers in results would point to wrong schools after shuffle
+    await supabase.from('results').delete().neq('id', '00000000-0000-0000-0000-000000000000')
 
     const oldSlots = withSlots.map(s => s.slot_number)
     const newSlots = [...oldSlots]

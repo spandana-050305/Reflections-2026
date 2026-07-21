@@ -57,7 +57,7 @@ export default function AdminResultsPage() {
       supabase.from('settings').select('points_1st, points_2nd, points_3rd').maybeSingle(),
       supabase.from('marks').select('event_id, slot_number, entry_index, total'),
     ])
-    const firstErr = catsErr ?? evsErr ?? scErr ?? resErr ?? mkErr
+    const firstErr = catsErr ?? evsErr ?? scErr ?? resErr ?? stgErr ?? mkErr
     if (firstErr) { showMessage(`❌ Failed to load: ${firstErr.message}`); return }
     setCategories(cats ?? [])
     setEvents(evs ?? [])

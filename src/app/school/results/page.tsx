@@ -26,8 +26,7 @@ function parseWinners(r: any): WinnerGroup[] {
 
 export default async function SchoolResultsPage() {
   const supabase = createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  const user = session?.user
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const slotNumber = (user.user_metadata?.slot_number as number | undefined) ?? 0

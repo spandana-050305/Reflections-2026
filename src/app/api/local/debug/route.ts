@@ -4,6 +4,9 @@ import path from 'path'
 import os from 'os'
 
 export async function GET() {
+  if (process.env.NEXT_PUBLIC_LOCAL_MODE !== 'true') {
+    return NextResponse.json({ error: 'Not available' }, { status: 403 })
+  }
   const dataDir = process.env.APPDATA
     ? path.join(process.env.APPDATA, 'reflections-local')
     : path.join(os.tmpdir(), 'reflections-local')

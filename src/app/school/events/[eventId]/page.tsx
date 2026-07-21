@@ -48,7 +48,7 @@ export default function EventDetailPage() {
         { data: participants, error: partErr },
         { data: settings, error: settErr },
       ] = await Promise.all([
-        supabase.from('events').select('*').eq('id', eventId).single(),
+        supabase.from('events').select('*').eq('id', eventId).maybeSingle(),
         supabase.from('participants')
           .select('*')
           .eq('event_id', eventId)

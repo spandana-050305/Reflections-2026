@@ -9,8 +9,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function SchoolEventsPage() {
   const supabase = createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  const user = session?.user
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const slotNumber = user.user_metadata?.slot_number as number | undefined

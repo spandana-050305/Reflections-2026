@@ -5,8 +5,8 @@ import type { Announcement } from '@/lib/types'
 
 export default async function ClubDashboard() {
   const supabase = createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session?.user) redirect('/login')
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const [
     { data: announcements },

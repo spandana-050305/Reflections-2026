@@ -179,8 +179,10 @@ export default function AdminManualMarksPage() {
   async function clearEventMarks() {
     if (!selectedEvent) return
     if (!confirm(`Clear all marks for "${selectedEvent.name}"? This cannot be undone.`)) return
-    await supabase.from('marks').delete().eq('event_id', selectedEvent.id)
-    await supabase.from('results').delete().eq('event_id', selectedEvent.id)
+    const { error: e1 } = await supabase.from('marks').delete().eq('event_id', selectedEvent.id)
+    if (e1) { showFlash('❌ Error clearing marks: ' + e1.message); return }
+    const { error: e2 } = await supabase.from('results').delete().eq('event_id', selectedEvent.id)
+    if (e2) { showFlash('❌ Error clearing results: ' + e2.message); return }
     showFlash('Marks and result cleared.')
     setEventMarks([])
     setMarksIndex(prev => { const s = new Set(prev); s.delete(selectedEvent.id); return s })
