@@ -117,6 +117,9 @@ export default function AdminSchoolsPage() {
     setShowShuffleWarning(false)
     setShuffling(true)
 
+    // Clear computed results first — slot numbers in results would point to wrong schools after shuffle
+    await supabase.from('results').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+
     const withSlots = schools.filter(s => s.slot_number != null)
     if (withSlots.length < 2) {
       showMsg('Need at least 2 schools with slot numbers to shuffle.', 'error')
@@ -336,7 +339,7 @@ export default function AdminSchoolsPage() {
       {showShuffleWarning && (
         <div className="card border-amber-200 bg-amber-50/60 space-y-3">
           <p className="text-sm text-amber-800 font-medium">
-            Shuffling will randomly reassign slot numbers to all schools and update their participants and marks. This cannot be undone. Continue?
+            Shuffling will randomly reassign slot numbers to all schools and update their participants and marks. Any computed results will be cleared (re-compute after shuffling). This cannot be undone. Continue?
           </p>
           <div className="flex gap-2">
             <button onClick={handleShuffle} className="btn-danger text-sm">Yes, shuffle</button>

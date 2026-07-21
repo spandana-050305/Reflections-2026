@@ -45,10 +45,11 @@ export default function AdminEventsPage() {
     const missing = ['A', 'B', 'C', 'D'].filter(n => !existing.has(n))
     if (missing.length > 0) {
       await supabase.from('categories').insert(
-        missing.map((n, i) => ({ name: n, display_order: ['A','B','C','D'].indexOf(n) + 1 }))
+        missing.map(n => ({ name: n, display_order: ['A', 'B', 'C', 'D'].indexOf(n) + 1 }))
       )
+      // Refetch regardless of insert error (some may already exist)
       const { data: fresh } = await supabase.from('categories').select('*').order('display_order')
-      setCategories(fresh ?? [])
+      setCategories(fresh ?? cats ?? [])
     } else {
       setCategories(cats ?? [])
     }

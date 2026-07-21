@@ -71,6 +71,7 @@ export default function AdminManualMarksPage() {
     if (!selectedEvent) { setDraft({}); return }
     const d: Record<number, Record<number, string>> = {}
     schools.forEach(s => {
+      if (!s.slot_number) return  // skip schools with no slot assigned
       d[s.slot_number] = {}
       for (let e = 1; e <= (selectedEvent.max_entries ?? 1); e++) {
         const row = eventMarks.find((m: any) => m.slot_number === s.slot_number && m.entry_index === e)
@@ -87,6 +88,7 @@ export default function AdminManualMarksPage() {
     const rows: any[] = []
     for (const [slotStr, entries] of Object.entries(draft)) {
       const slot = Number(slotStr)
+      if (!slot || isNaN(slot)) continue  // skip invalid/unassigned slots
       for (const [entryStr, scoreStr] of Object.entries(entries)) {
         const entry = Number(entryStr)
         const total = parseFloat(scoreStr)
