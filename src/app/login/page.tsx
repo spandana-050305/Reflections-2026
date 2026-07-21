@@ -78,7 +78,8 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      const loginEmail = email.includes('@') ? email : `${email}@reflections.in`
+      const { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password })
 
       if (error || !data.user) {
         setError(error?.message ?? 'Invalid email or password. Please try again.')
@@ -144,10 +145,10 @@ export default function LoginPage() {
                 <h2 className="text-lg font-semibold text-slate-800 mb-6">Sign in to your account</h2>
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Email / Login ID</label>
                     <div className="relative">
                       <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="input pl-10" placeholder="your@email.com" required />
+                      <input type="text" value={email} onChange={e => setEmail(e.target.value)} className="input pl-10" placeholder="your@email.com or login ID" required />
                     </div>
                   </div>
                   <div>
