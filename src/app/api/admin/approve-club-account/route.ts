@@ -11,15 +11,17 @@ function adminClient() {
 
 export async function POST(req: NextRequest) {
   const { accountId, userId } = await req.json()
-  if (!accountId || !userId) return NextResponse.json({ error: 'Missing accountId or userId' }, { status: 400 })
+  if (!accountId) return NextResponse.json({ error: 'Missing accountId' }, { status: 400 })
 
   const admin = adminClient()
 
-  // Confirm email in Supabase Auth so the user can log in
-  const { error: authErr } = await admin.auth.admin.updateUserById(userId, {
-    email_confirm: true,
-  })
-  if (authErr) return NextResponse.json({ error: authErr.message }, { status: 500 })
+  // Confirm email in Supabase Auth if we have the userId
+  if (userId) {
+    const { error: authErr } = await admin.auth.admin.updateUserById(userId, {
+      email_confirm: true,
+    })
+    if (authErr) return NextResponse.json({ error: authErr.message }, { status: 500 })
+  }
 
   // Update club_accounts status to approved
   const { error: dbErr } = await admin
