@@ -38,7 +38,7 @@ export default function LoginPage() {
     const regEmail = `${slug}@reflections.in`
 
     try {
-      const { error: signUpErr } = await supabase.auth.signUp({
+      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
         email: regEmail,
         password: regPassword,
         options: { data: { role: regRole } },
@@ -54,6 +54,7 @@ export default function LoginPage() {
         email: regEmail,
         role: regRole,
         status: 'pending',
+        user_id: signUpData?.user?.id ?? null,
         created_at: new Date().toISOString(),
       })
       if (dbErr) {
