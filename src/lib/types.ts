@@ -119,6 +119,7 @@ export type ClubAccountStatus = 'pending' | 'approved' | 'rejected'
 export type RegisterRole = 'final_year' | 'club_member'
 export interface ClubAccount {
   id: string
+  user_id: string
   name: string
   login_id: string
   email: string

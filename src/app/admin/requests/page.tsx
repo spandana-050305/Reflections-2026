@@ -38,12 +38,25 @@ export default function AdminRequestsPage() {
 
   async function setStatus(acct: ClubAccount, status: ClubAccountStatus) {
     setBusy(acct.id)
-    const { error } = await supabase.from('club_accounts')
-      .update({ status, reviewed_at: new Date().toISOString() })
-      .eq('id', acct.id)
-    if (error) { flash(`❌ ${error.message}`); setBusy(null); return }
+
+    if (status === 'approved') {
+      // Use API route to confirm email in Supabase Auth + update status
+      const res = await fetch('/api/admin/approve-club-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId: acct.id, userId: acct.user_id }),
+      })
+      const json = await res.json()
+      if (!res.ok) { flash(`❌ ${json.error ?? 'Approval failed'}`); setBusy(null); return }
+    } else {
+      const { error } = await supabase.from('club_accounts')
+        .update({ status, reviewed_at: new Date().toISOString() })
+        .eq('id', acct.id)
+      if (error) { flash(`❌ ${error.message}`); setBusy(null); return }
+    }
+
     await load()
-    flash(`${acct.name} ${status === 'approved' ? 'approved' : status === 'rejected' ? 'rejected' : 'updated'} ✓`)
+    flash(`${acct.name} ${status === 'approved' ? 'approved ✓ — they can now log in' : status === 'rejected' ? 'rejected' : 'updated'} ✓`)
     setBusy(null)
   }
 
