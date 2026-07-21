@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Plus, Trash2, X, Save, Shuffle, Copy, Check, Eye, EyeOff, KeyRound, FileDown } from 'lucide-react'
+import PageSpinner from '@/components/layout/PageSpinner'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
@@ -37,6 +38,7 @@ export default function AdminSchoolsPage() {
   const [shuffling, setShuffling] = useState(false)
   const [showShuffleWarning, setShowShuffleWarning] = useState(false)
   const [showAllCreds, setShowAllCreds] = useState(false)
+  const [loading, setLoading] = useState(true)
   const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => () => { if (msgTimer.current) clearTimeout(msgTimer.current) }, [])
@@ -45,8 +47,9 @@ export default function AdminSchoolsPage() {
 
   async function load() {
     const { data, error } = await supabase.from('schools').select('*').order('slot_number')
-    if (error) { showMsg(`❌ Failed to load schools: ${error.message}`, 'error'); return }
+    if (error) { showMsg(`❌ Failed to load schools: ${error.message}`, 'error') }
     setSchools(data ?? [])
+    setLoading(false)
   }
 
   useEffect(() => { load() }, [])
@@ -300,6 +303,8 @@ export default function AdminSchoolsPage() {
     XLSX.utils.book_append_sheet(wb, ws, 'Credentials')
     XLSX.writeFile(wb, `slot-${school.slot_number ?? 'na'}-credentials.xlsx`)
   }
+
+  if (loading) return <PageSpinner />
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">

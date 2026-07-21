@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Pencil, Save, Check, Trophy, Eye, EyeOff } from 'lucide-react'
 import type { Category, Event } from '@/lib/types'
+import PageSpinner from '@/components/layout/PageSpinner'
 
 interface WinnerEntry { slot: number; entry: number; names: string }
 interface WinnerGroup { rank: number; total: number; entries: WinnerEntry[] }
@@ -23,6 +24,7 @@ export default function AdminManualMarksPage() {
 
   const [draft, setDraft] = useState<Record<number, Record<number, string>>>({})
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [computing, setComputing] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [flash, setFlash] = useState('')
@@ -51,7 +53,7 @@ export default function AdminManualMarksPage() {
       supabase.from('results').select('*'),
     ])
     const firstErr = catsErr ?? evsErr ?? scErr ?? mkErr ?? resErr
-    if (firstErr) { showFlash(`❌ Failed to load: ${firstErr.message}`); return }
+    if (firstErr) { showFlash(`❌ Failed to load: ${firstErr.message}`); setLoading(false); return }
     setCategories(cats ?? [])
     setEvents((evs as Event[]) ?? [])
     setSchools(sc ?? [])
@@ -60,6 +62,7 @@ export default function AdminManualMarksPage() {
     ;(res ?? []).forEach((r: any) => { resMap[r.event_id] = r })
     setResults(resMap)
     if (cats?.[0]) setSelectedCat(prev => prev || cats[0].id)
+    setLoading(false)
   }
 
   useEffect(() => { load() }, [])
@@ -188,6 +191,8 @@ export default function AdminManualMarksPage() {
     setMarksIndex(prev => { const s = new Set(prev); s.delete(selectedEvent.id); return s })
     await load()
   }
+
+  if (loading) return <PageSpinner />
 
   const filteredEvents = events.filter(e => e.category_id === selectedCat)
   const maxEntries = selectedEvent?.max_entries ?? 1

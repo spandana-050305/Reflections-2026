@@ -7,6 +7,7 @@ import {
   Pencil, Lock, Unlock, Settings2, ShieldCheck,
 } from 'lucide-react'
 import type { Category, Event } from '@/lib/types'
+import PageSpinner from '@/components/layout/PageSpinner'
 
 const eKey = (slot: number, entry: number) => `${slot}_${entry}`
 
@@ -25,6 +26,7 @@ export default function AdminGuestMarksPage() {
   const [results, setResults] = useState<Record<string, any>>({})
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [flashMsg, setFlashMsg] = useState('')
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -128,13 +130,14 @@ export default function AdminGuestMarksPage() {
   useEffect(() => {
     async function init() {
       const base = await loadBase()
-      if (!base) return
+      if (!base) { setLoading(false); return }
       const { cats, evs } = base
       const firstCat = cats[0]?.id
       if (firstCat) {
         setSelectedCat(firstCat)
         await loadCategory(firstCat, evs)
       }
+      setLoading(false)
     }
     init()
   }, [])
@@ -362,6 +365,8 @@ export default function AdminGuestMarksPage() {
     flash('Winners computed from guest marks ✓')
     setComputeTarget(null)
   }
+
+  if (loading) return <PageSpinner />
 
   const filteredEvents = selectedCat ? events.filter(e => e.category_id === selectedCat) : events
 

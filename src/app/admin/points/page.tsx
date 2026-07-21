@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { TableProperties } from 'lucide-react'
+import PageSpinner from '@/components/layout/PageSpinner'
 
 export default function AdminPointsPage() {
   const supabase = createClient()
@@ -16,6 +17,7 @@ export default function AdminPointsPage() {
   // Points settings (read-only here — configure in Marks page)
   const [pts, setPts] = useState({ p1: 15, p2: 10, p3: 5 })
   const [loadError, setLoadError] = useState('')
+  const [loading, setLoading] = useState(true)
 
   async function load() {
     const [
@@ -32,7 +34,7 @@ export default function AdminPointsPage() {
       supabase.from('settings').select('*').maybeSingle(),
     ])
     const firstErr = resErr ?? scErr ?? catsErr ?? evsErr ?? stgErr
-    if (firstErr) { setLoadError(`❌ Failed to load: ${firstErr.message}`); return }
+    if (firstErr) { setLoadError(`❌ Failed to load: ${firstErr.message}`); setLoading(false); return }
     setResults(res ?? [])
     setSchools(sc ?? [])
     setCategories(cats ?? [])
@@ -45,9 +47,12 @@ export default function AdminPointsPage() {
       }
       setPts(p)
     }
+    setLoading(false)
   }
 
   useEffect(() => { load() }, [])
+
+  if (loading) return <PageSpinner />
 
   const totalFinalized = results.length
   const totalPublished = results.filter((r: any) => r.published).length

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Trophy, Lock, CheckCircle2, Clock } from 'lucide-react'
 import type { Category, Event } from '@/lib/types'
+import PageSpinner from '@/components/layout/PageSpinner'
 
 interface WinnerEntry { slot: number; entry: number; names: string }
 interface WinnerGroup { rank: number; total: number; entries: WinnerEntry[] }
@@ -30,6 +31,7 @@ export default function AdminResultsPage() {
   const [computing, setComputing] = useState<string | null>(null)
   const [selectedCat, setSelectedCat] = useState('')
   const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(true)
   const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function showMessage(text: string) {
@@ -58,7 +60,7 @@ export default function AdminResultsPage() {
       supabase.from('marks').select('event_id, slot_number, entry_index, total'),
     ])
     const firstErr = catsErr ?? evsErr ?? scErr ?? resErr ?? stgErr ?? mkErr
-    if (firstErr) { showMessage(`❌ Failed to load: ${firstErr.message}`); return }
+    if (firstErr) { showMessage(`❌ Failed to load: ${firstErr.message}`); setLoading(false); return }
     setCategories(cats ?? [])
     setEvents(evs ?? [])
     setSchools(sc ?? [])
@@ -66,6 +68,7 @@ export default function AdminResultsPage() {
     setManualMarks(mk ?? [])
     if (stg) setRankPts({ 1: stg.points_1st ?? 15, 2: stg.points_2nd ?? 10, 3: stg.points_3rd ?? 5 })
     if (cats?.[0]) setSelectedCat(prev => prev || cats[0].id)
+    setLoading(false)
   }
 
   async function computeWinners(eventId: string) {
@@ -109,6 +112,8 @@ export default function AdminResultsPage() {
     showMessage(currentlyPublished ? 'Result unpublished.' : 'Result published to schools!')
     await load()
   }
+
+  if (loading) return <PageSpinner />
 
   const eventsInCat = events.filter(e => e.category_id === selectedCat)
 

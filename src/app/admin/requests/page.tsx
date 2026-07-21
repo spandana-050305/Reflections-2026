@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { UserCheck, Check, X, Clock, CheckCircle2, XCircle, RotateCcw, Trash2, KeyRound } from 'lucide-react'
 import type { ClubAccount, ClubAccountStatus } from '@/lib/types'
+import PageSpinner from '@/components/layout/PageSpinner'
 
 const FILTERS: { key: ClubAccountStatus | 'all'; label: string }[] = [
   { key: 'pending', label: 'Pending' },
@@ -20,6 +21,7 @@ export default function AdminRequestsPage() {
   const [busy, setBusy] = useState<string | null>(null)
   const [resetTarget, setResetTarget] = useState<ClubAccount | null>(null)
   const [newPassword, setNewPassword] = useState('')
+  const [loading, setLoading] = useState(true)
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function flash(msg: string) {
@@ -32,8 +34,9 @@ export default function AdminRequestsPage() {
 
   async function load() {
     const { data, error } = await supabase.from('club_accounts').select('*').order('created_at', { ascending: false })
-    if (error) { flash(`❌ Failed to load requests: ${error.message}`); return }
+    if (error) { flash(`❌ Failed to load requests: ${error.message}`); setLoading(false); return }
     setAccounts((data as ClubAccount[]) ?? [])
+    setLoading(false)
   }
 
   useEffect(() => { load() }, [])
@@ -91,6 +94,8 @@ export default function AdminRequestsPage() {
     flash(`${acct.name}'s request deleted ✓`)
     setBusy(null)
   }
+
+  if (loading) return <PageSpinner />
 
   const pendingCount = accounts.filter(a => a.status === 'pending').length
   const visible = filter === 'all' ? accounts : accounts.filter(a => a.status === filter)

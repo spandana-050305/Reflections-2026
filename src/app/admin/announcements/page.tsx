@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Megaphone, Trash2, Plus, X, Send } from 'lucide-react'
 import type { Announcement } from '@/lib/types'
+import PageSpinner from '@/components/layout/PageSpinner'
 
 export default function AdminAnnouncementsPage() {
   const supabase = createClient()
@@ -12,11 +13,13 @@ export default function AdminAnnouncementsPage() {
   const [form, setForm] = useState({ title: '', message: '' })
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(true)
 
   async function load() {
     const { data, error } = await supabase.from('announcements').select('*').order('created_at', { ascending: false })
-    if (error) { setMessage(`❌ Failed to load announcements: ${error.message}`); return }
+    if (error) { setMessage(`❌ Failed to load announcements: ${error.message}`) }
     setAnnouncements(data ?? [])
+    setLoading(false)
   }
 
   useEffect(() => { load() }, [])
@@ -39,6 +42,8 @@ export default function AdminAnnouncementsPage() {
     if (error) { setMessage(`❌ ${error.message}`); return }
     await load()
   }
+
+  if (loading) return <PageSpinner />
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">

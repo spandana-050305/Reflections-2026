@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Pencil, Trash2, Check, X, FileDown, ClipboardList, Users, CheckCircle2, XCircle } from 'lucide-react'
+import PageSpinner from '@/components/layout/PageSpinner'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
@@ -20,6 +21,7 @@ export default function AdminParticipantsPage() {
   const [selectedCat, setSelectedCat] = useState('')
   const [selectedEvent, setSelectedEvent] = useState('')
   const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(true)
 
   // Edit state: participantId → editName
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -52,11 +54,12 @@ export default function AdminParticipantsPage() {
       supabase.from('schools').select('slot_number, school_name'),
     ])
     const firstErr = catsErr ?? evsErr ?? scErr
-    if (firstErr) { flash(`❌ Failed to load data: ${firstErr.message}`); return }
+    if (firstErr) { flash(`❌ Failed to load data: ${firstErr.message}`); setLoading(false); return }
     setCategories(cats ?? [])
     setEvents(evs ?? [])
     setSchools(sc ?? [])
     if (!selectedCat && cats?.[0]) setSelectedCat(cats[0].id)
+    setLoading(false)
   }
 
   async function loadParticipants(eventId: string) {
@@ -87,6 +90,8 @@ export default function AdminParticipantsPage() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showEventPicker])
+
+  if (loading) return <PageSpinner />
 
   const schoolMap: Record<number, string> = {}
   schools.forEach(s => { schoolMap[s.slot_number] = s.school_name })

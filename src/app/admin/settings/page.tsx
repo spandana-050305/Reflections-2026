@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Settings, Lock, Unlock, Plus, Trash2, Copy, Eye, EyeOff, FileDown, KeyRound, X, Save, Layers, ShieldCheck } from 'lucide-react'
+import PageSpinner from '@/components/layout/PageSpinner'
 import * as XLSX from 'xlsx'
 import { SECURITY_QUESTIONS } from '@/lib/types'
 
@@ -239,11 +240,7 @@ export default function AdminSettingsPage() {
     XLSX.writeFile(wb, 'guest-evaluator-credentials.xlsx')
   }
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
-    </div>
-  )
+  if (loading) return <PageSpinner />
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">

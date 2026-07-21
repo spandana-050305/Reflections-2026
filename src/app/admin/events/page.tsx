@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Plus, X, Save } from 'lucide-react'
 import type { Category } from '@/lib/types'
+import PageSpinner from '@/components/layout/PageSpinner'
 import { parseAssignedMembers } from '@/lib/types'
 
 const DEFAULT_CRITERIA = ['', '', '', '']
@@ -31,6 +32,7 @@ export default function AdminEventsPage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(true)
 
   async function load() {
     const [{ data: cats, error: catsErr }, { data: evs, error: evsErr }] = await Promise.all([
@@ -38,7 +40,7 @@ export default function AdminEventsPage() {
       supabase.from('events').select('*, categories(name)').order('name'),
     ])
     const firstErr = catsErr ?? evsErr
-    if (firstErr) { setMessage(`❌ Failed to load: ${firstErr.message}`); return }
+    if (firstErr) { setMessage(`❌ Failed to load: ${firstErr.message}`); setLoading(false); return }
 
     // Auto-create any missing A/B/C/D categories
     const existing = new Set((cats ?? []).map((c: any) => c.name))
@@ -54,6 +56,7 @@ export default function AdminEventsPage() {
       setCategories(cats ?? [])
     }
     setEvents(evs ?? [])
+    setLoading(false)
   }
 
   useEffect(() => { load() }, [])
@@ -151,6 +154,8 @@ export default function AdminEventsPage() {
     if (error) { setMessage(`❌ ${error.message}`); return }
     await load()
   }
+
+  if (loading) return <PageSpinner />
 
   const eventsByCategory: Record<string, any[]> = {}
   events.forEach(ev => {
