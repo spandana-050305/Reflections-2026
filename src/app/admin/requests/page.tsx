@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { UserCheck, Check, X, Clock, CheckCircle2, XCircle, RotateCcw, Trash2 } from 'lucide-react'
+import { UserCheck, Check, X, Clock, CheckCircle2, XCircle, RotateCcw, Trash2, KeyRound } from 'lucide-react'
 import type { ClubAccount, ClubAccountStatus } from '@/lib/types'
 
 const FILTERS: { key: ClubAccountStatus | 'all'; label: string }[] = [
@@ -18,6 +18,8 @@ export default function AdminRequestsPage() {
   const [filter, setFilter] = useState<ClubAccountStatus | 'all'>('pending')
   const [flashMsg, setFlashMsg] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
+  const [resetTarget, setResetTarget] = useState<ClubAccount | null>(null)
+  const [newPassword, setNewPassword] = useState('')
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function flash(msg: string) {
@@ -58,6 +60,22 @@ export default function AdminRequestsPage() {
     await load()
     flash(`${acct.name} ${status === 'approved' ? 'approved ✓ — they can now log in' : status === 'rejected' ? 'rejected' : 'updated'} ✓`)
     setBusy(null)
+  }
+
+  async function resetPassword() {
+    if (!resetTarget || !newPassword) return
+    setBusy(resetTarget.id)
+    const res = await fetch('/api/admin/reset-club-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: resetTarget.user_id, email: resetTarget.email, newPassword }),
+    })
+    const json = await res.json()
+    setBusy(null)
+    setResetTarget(null)
+    setNewPassword('')
+    if (!res.ok) { flash(`❌ ${json.error ?? 'Reset failed'}`); return }
+    flash(`Password reset for ${resetTarget.name} ✓`)
   }
 
   async function deleteRequest(acct: ClubAccount) {
@@ -139,11 +157,35 @@ export default function AdminRequestsPage() {
                   <button onClick={() => setStatus(a, 'approved')} disabled={busy === a.id}
                     className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1"><RotateCcw size={13} /> Approve</button>
                 )}
+                <button onClick={() => { setResetTarget(a); setNewPassword('') }} disabled={busy === a.id}
+                  title="Reset password" className="text-gray-400 hover:text-brand-500 p-1.5"><KeyRound size={15} /></button>
                 <button onClick={() => deleteRequest(a)} disabled={busy === a.id}
                   title="Delete request" className="text-gray-400 hover:text-red-500 p-1.5"><Trash2 size={15} /></button>
               </div>
             </div>
           ))}
+        </div>
+      )}
+      {/* Reset Password Modal */}
+      {resetTarget && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm space-y-4">
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2"><KeyRound size={18} className="text-brand-600" /> Reset Password</h3>
+            <p className="text-sm text-gray-500">Set a new password for <span className="font-medium text-gray-700">{resetTarget.name}</span> ({resetTarget.email})</p>
+            <input
+              type="text"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              placeholder="New password (min 4 chars)"
+              className="input w-full"
+              autoFocus
+            />
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setResetTarget(null)} className="btn-secondary text-sm px-4 py-2">Cancel</button>
+              <button onClick={resetPassword} disabled={newPassword.length < 4 || busy === resetTarget.id}
+                className="btn-primary text-sm px-4 py-2">Reset</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
