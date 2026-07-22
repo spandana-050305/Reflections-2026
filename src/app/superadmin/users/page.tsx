@@ -1,20 +1,25 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ShieldCheck, KeyRound, Trash2, Users, School, UserCheck, ClipboardList, ChevronDown, ChevronRight } from 'lucide-react'
+import {
+  ShieldCheck, KeyRound, Trash2, Users, School, UserCheck,
+  ClipboardList, ChevronDown, ChevronRight, Ban, CheckCircle2,
+  LogOut, ArrowUpDown,
+} from 'lucide-react'
 import PageSpinner from '@/components/layout/PageSpinner'
 
 interface AuthUser {
   id: string
   email: string
   role: string
-  name: string | null
+  banned: boolean
   created_at: string
   last_sign_in_at: string | null
 }
 
-const ROLE_ORDER = ['final_year', 'club_member', 'school', 'guest', 'unknown']
+const ROLE_ORDER = ['super_admin', 'final_year', 'club_member', 'school', 'guest', 'unknown']
 const ROLE_LABELS: Record<string, string> = {
+  super_admin: 'Super Admin',
   final_year: 'Final Year',
   club_member: 'Club Member',
   school: 'School',
@@ -22,19 +27,22 @@ const ROLE_LABELS: Record<string, string> = {
   unknown: 'Unknown',
 }
 const ROLE_COLORS: Record<string, string> = {
-  final_year: 'bg-violet-100 text-violet-700',
+  super_admin: 'bg-violet-100 text-violet-700',
+  final_year: 'bg-violet-50 text-violet-600',
   club_member: 'bg-blue-50 text-blue-600',
   school: 'bg-green-50 text-green-700',
   guest: 'bg-amber-50 text-amber-700',
   unknown: 'bg-gray-100 text-gray-500',
 }
 const ROLE_ICONS: Record<string, any> = {
+  super_admin: ShieldCheck,
   final_year: ShieldCheck,
   club_member: UserCheck,
   school: School,
   guest: ClipboardList,
   unknown: Users,
 }
+const PROMOTABLE_ROLES = ['club_member', 'final_year', 'school', 'guest']
 
 export default function SuperAdminUsersPage() {
   const [users, setUsers] = useState<AuthUser[]>([])
@@ -42,7 +50,9 @@ export default function SuperAdminUsersPage() {
   const [flashMsg, setFlashMsg] = useState('')
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['final_year']))
   const [resetTarget, setResetTarget] = useState<AuthUser | null>(null)
+  const [roleTarget, setRoleTarget] = useState<AuthUser | null>(null)
   const [newPassword, setNewPassword] = useState('')
+  const [newRole, setNewRole] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -64,29 +74,66 @@ export default function SuperAdminUsersPage() {
 
   useEffect(() => { load() }, [])
 
-  async function resetPassword() {
-    if (!resetTarget || !newPassword) return
-    setBusy(resetTarget.id)
+  async function callAction(action: string, user: AuthUser, extra?: Record<string, any>) {
+    setBusy(user.id)
     const res = await fetch('/api/superadmin/manage-user', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: resetTarget.id, newPassword }),
+      body: JSON.stringify({ action, userId: user.id, targetEmail: user.email, ...extra }),
     })
     const json = await res.json()
     setBusy(null)
-    setResetTarget(null)
-    setNewPassword('')
-    if (!res.ok) { flash(`❌ ${json.error ?? 'Reset failed'}`); return }
-    flash(`Password reset for ${resetTarget.email} ✓`)
+    if (!res.ok) { flash(`❌ ${json.error ?? 'Action failed'}`); return false }
+    return true
+  }
+
+  async function resetPassword() {
+    if (!resetTarget || !newPassword) return
+    const ok = await callAction('reset_password', resetTarget, { newPassword })
+    if (ok) {
+      flash(`Password reset for ${resetTarget.email} ✓`)
+      setResetTarget(null)
+      setNewPassword('')
+    }
+  }
+
+  async function changeRole() {
+    if (!roleTarget || !newRole) return
+    const ok = await callAction('change_role', roleTarget, { newRole })
+    if (ok) {
+      flash(`Role changed to ${ROLE_LABELS[newRole]} for ${roleTarget.email} ✓`)
+      setRoleTarget(null)
+      setNewRole('')
+      await load()
+    }
+  }
+
+  async function suspend(user: AuthUser) {
+    if (!confirm(`Suspend ${user.email}? They will be immediately logged out and cannot log in.`)) return
+    const ok = await callAction('suspend', user)
+    if (ok) { flash(`${user.email} suspended ✓`); await load() }
+  }
+
+  async function unsuspend(user: AuthUser) {
+    const ok = await callAction('unsuspend', user)
+    if (ok) { flash(`${user.email} unsuspended ✓`); await load() }
+  }
+
+  async function forceLogout(user: AuthUser) {
+    if (!confirm(`Force logout ${user.email}? Their current session will be invalidated immediately.`)) return
+    setBusy(user.id)
+    flash(`Logging out ${user.email}…`)
+    const ok = await callAction('force_logout', user)
+    if (ok) flash(`${user.email} logged out ✓`)
   }
 
   async function deleteUser(user: AuthUser) {
-    if (!confirm(`Delete ${user.email}? This cannot be undone.`)) return
+    if (!confirm(`Permanently delete ${user.email}? This cannot be undone.`)) return
     setBusy(user.id)
     const res = await fetch('/api/superadmin/manage-user', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id }),
+      body: JSON.stringify({ userId: user.id, targetEmail: user.email }),
     })
     const json = await res.json()
     if (!res.ok) { flash(`❌ ${json.error ?? 'Delete failed'}`); setBusy(null); return }
@@ -117,7 +164,7 @@ export default function SuperAdminUsersPage() {
         <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <ShieldCheck size={22} className="text-violet-600" /> User Management
         </h2>
-        <p className="text-sm text-gray-500 mt-1">All registered users across all portals. Super admin only.</p>
+        <p className="text-sm text-gray-500 mt-1">All registered users. Promote, suspend, reset passwords, force logout.</p>
       </div>
 
       {flashMsg && (
@@ -128,12 +175,12 @@ export default function SuperAdminUsersPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {ROLE_ORDER.filter(r => grouped[r]?.length).map(role => {
+        {ROLE_ORDER.filter(r => grouped[r]?.length && r !== 'super_admin').map(role => {
           const Icon = ROLE_ICONS[role]
           return (
             <div key={role} className="card py-3 flex items-center gap-3">
-              <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${ROLE_COLORS[role].replace('text-', 'bg-').split(' ')[0]}20`}>
-                <Icon size={17} className={ROLE_COLORS[role].split(' ')[1]} />
+              <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${ROLE_COLORS[role]}`}>
+                <Icon size={16} />
               </div>
               <div>
                 <p className="text-xl font-bold text-gray-800">{grouped[role].length}</p>
@@ -168,31 +215,68 @@ export default function SuperAdminUsersPage() {
             {isOpen && (
               <div className="border-t border-gray-100 divide-y divide-gray-50">
                 {roleUsers.map(u => (
-                  <div key={u.id} className="flex items-center justify-between px-5 py-3 gap-3">
+                  <div key={u.id} className={`flex items-center justify-between px-5 py-3 gap-3 ${u.banned ? 'bg-red-50/40' : ''}`}>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-800 truncate">{u.email}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium text-gray-800 truncate font-mono">{u.email}</p>
+                        {u.banned && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">Suspended</span>}
+                      </div>
                       <p className="text-xs text-gray-400 mt-0.5">
                         Joined {new Date(u.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                        {u.last_sign_in_at && ` · Last login ${new Date(u.last_sign_in_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`}
+                        {u.last_sign_in_at
+                          ? ` · Last login ${new Date(u.last_sign_in_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+                          : ' · Never logged in'}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* Promote/demote — not for super_admin */}
+                      {role !== 'super_admin' && (
+                        <button
+                          onClick={() => { setRoleTarget(u); setNewRole(u.role) }}
+                          disabled={busy === u.id}
+                          title="Change role"
+                          className="text-gray-400 hover:text-violet-500 p-1.5"
+                        >
+                          <ArrowUpDown size={14} />
+                        </button>
+                      )}
+                      {/* Reset password */}
                       <button
                         onClick={() => { setResetTarget(u); setNewPassword('') }}
                         disabled={busy === u.id}
                         title="Reset password"
                         className="text-gray-400 hover:text-brand-500 p-1.5"
                       >
-                        <KeyRound size={15} />
+                        <KeyRound size={14} />
                       </button>
-                      <button
-                        onClick={() => deleteUser(u)}
-                        disabled={busy === u.id}
-                        title="Delete user"
-                        className="text-gray-400 hover:text-red-500 p-1.5"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      {/* Force logout */}
+                      {role !== 'super_admin' && (
+                        <button
+                          onClick={() => forceLogout(u)}
+                          disabled={busy === u.id}
+                          title="Force logout"
+                          className="text-gray-400 hover:text-amber-500 p-1.5"
+                        >
+                          <LogOut size={14} />
+                        </button>
+                      )}
+                      {/* Suspend / unsuspend */}
+                      {role !== 'super_admin' && (
+                        u.banned
+                          ? <button onClick={() => unsuspend(u)} disabled={busy === u.id} title="Unsuspend" className="text-gray-400 hover:text-green-500 p-1.5"><CheckCircle2 size={14} /></button>
+                          : <button onClick={() => suspend(u)} disabled={busy === u.id} title="Suspend" className="text-gray-400 hover:text-orange-500 p-1.5"><Ban size={14} /></button>
+                      )}
+                      {/* Delete */}
+                      {role !== 'super_admin' && (
+                        <button
+                          onClick={() => deleteUser(u)}
+                          disabled={busy === u.id}
+                          title="Delete user"
+                          className="text-gray-400 hover:text-red-500 p-1.5"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -213,26 +297,38 @@ export default function SuperAdminUsersPage() {
             <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <KeyRound size={18} className="text-brand-600" /> Reset Password
             </h3>
-            <p className="text-sm text-gray-500">
-              New password for <span className="font-medium text-gray-700 font-mono">{resetTarget.email}</span>
-            </p>
-            <input
-              type="text"
-              value={newPassword}
-              onChange={e => setNewPassword(e.target.value)}
-              placeholder="New password (min 4 chars)"
-              className="input w-full"
-              autoFocus
-            />
+            <p className="text-sm text-gray-500">New password for <span className="font-mono font-medium text-gray-700">{resetTarget.email}</span></p>
+            <input type="text" value={newPassword} onChange={e => setNewPassword(e.target.value)}
+              placeholder="New password (min 4 chars)" className="input w-full" autoFocus />
             <div className="flex gap-2 justify-end">
               <button onClick={() => setResetTarget(null)} className="btn-secondary text-sm px-4 py-2">Cancel</button>
-              <button
-                onClick={resetPassword}
-                disabled={newPassword.length < 4 || busy === resetTarget.id}
-                className="btn-primary text-sm px-4 py-2"
-              >
-                Reset
-              </button>
+              <button onClick={resetPassword} disabled={newPassword.length < 4 || busy === resetTarget.id}
+                className="btn-primary text-sm px-4 py-2">Reset</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Role Modal */}
+      {roleTarget && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm space-y-4">
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <ArrowUpDown size={18} className="text-violet-600" /> Change Role
+            </h3>
+            <p className="text-sm text-gray-500">Change role for <span className="font-mono font-medium text-gray-700">{roleTarget.email}</span></p>
+            <div className="grid grid-cols-2 gap-2">
+              {PROMOTABLE_ROLES.map(r => (
+                <button key={r} type="button" onClick={() => setNewRole(r)}
+                  className={`px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${newRole === r ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-gray-600 border-gray-200 hover:border-violet-300'}`}>
+                  {ROLE_LABELS[r]}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setRoleTarget(null)} className="btn-secondary text-sm px-4 py-2">Cancel</button>
+              <button onClick={changeRole} disabled={!newRole || newRole === roleTarget.role || busy === roleTarget.id}
+                className="btn-primary text-sm px-4 py-2">Save</button>
             </div>
           </div>
         </div>
