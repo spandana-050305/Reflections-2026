@@ -29,7 +29,10 @@ export default function AdminGuestMarksPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [flashMsg, setFlashMsg] = useState('')
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+  const selectedCatRef = useRef(selectedCat)
   const [computeTarget, setComputeTarget] = useState<string | null>(null)
   const [lockAllTarget, setLockAllTarget] = useState<string | null>(null)
   const [fullUnlockTarget, setFullUnlockTarget] = useState<string | null>(null)
@@ -124,8 +127,12 @@ export default function AdminGuestMarksPage() {
     const res: Record<string, any> = {}
     ;(resultData ?? []).forEach((r: any) => { res[r.event_id] = r })
     setResults(res)
-    await loadCategory(selectedCat)
+    await loadCategory(selectedCatRef.current)
+    setLastRefreshed(new Date())
   }
+
+  // Keep ref in sync so the interval always uses the latest selected category
+  useEffect(() => { selectedCatRef.current = selectedCat }, [selectedCat])
 
   useEffect(() => {
     async function init() {
@@ -135,11 +142,15 @@ export default function AdminGuestMarksPage() {
       const firstCat = cats[0]?.id
       if (firstCat) {
         setSelectedCat(firstCat)
+        selectedCatRef.current = firstCat
         await loadCategory(firstCat, evs)
       }
+      setLastRefreshed(new Date())
       setLoading(false)
     }
     init()
+    refreshTimer.current = setInterval(reload, 30000)
+    return () => { if (refreshTimer.current) clearInterval(refreshTimer.current) }
   }, [])
 
   async function savePoints() {
@@ -377,7 +388,10 @@ export default function AdminGuestMarksPage() {
           <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <ClipboardCheck size={22} className="text-brand-600" /> Guest Marks
           </h2>
-          <p className="text-sm text-gray-500 mt-1">Marks submitted by judges, averaged · lock to finalize</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Marks submitted by judges, averaged · lock to finalize
+            {lastRefreshed && <span className="ml-2 text-xs text-gray-400">· Auto-refreshes every 30s · Last: {lastRefreshed.toLocaleTimeString()}</span>}
+          </p>
         </div>
         <button onClick={() => setShowPtsPanel(v => !v)} className="btn-secondary flex items-center gap-2 text-sm">
           <Settings2 size={15} /> Points Config

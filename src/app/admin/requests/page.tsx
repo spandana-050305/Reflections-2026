@@ -22,7 +22,9 @@ export default function AdminRequestsPage() {
   const [resetTarget, setResetTarget] = useState<ClubAccount | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [loading, setLoading] = useState(true)
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   function flash(msg: string) {
     if (flashTimer.current) clearTimeout(flashTimer.current)
@@ -36,10 +38,15 @@ export default function AdminRequestsPage() {
     const { data, error } = await supabase.from('club_accounts').select('*').order('created_at', { ascending: false })
     if (error) { flash(`❌ Failed to load requests: ${error.message}`); setLoading(false); return }
     setAccounts((data as ClubAccount[]) ?? [])
+    setLastRefreshed(new Date())
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    refreshTimer.current = setInterval(load, 30000)
+    return () => { if (refreshTimer.current) clearInterval(refreshTimer.current) }
+  }, [])
 
   async function setStatus(acct: ClubAccount, status: ClubAccountStatus) {
     setBusy(acct.id)
@@ -109,9 +116,14 @@ export default function AdminRequestsPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <UserCheck size={22} className="text-brand-600" /> Club Member Requests
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <UserCheck size={22} className="text-brand-600" /> Club Member Requests
+          </h2>
+          {lastRefreshed && (
+            <span className="text-xs text-gray-400">Auto-refreshes every 30s · Last: {lastRefreshed.toLocaleTimeString()}</span>
+          )}
+        </div>
         <p className="text-sm text-gray-500 mt-1">Approve or reject club members who registered from the sign-in page.</p>
       </div>
 
