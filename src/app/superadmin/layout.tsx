@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
-import { ShieldCheck, Users, LayoutDashboard, Activity } from 'lucide-react'
+import { ShieldCheck, Users, LayoutDashboard, Activity, ClipboardCheck } from 'lucide-react'
 import NavBar from '@/components/layout/NavBar'
 import NavLink from '@/components/layout/NavLink'
 
@@ -14,6 +14,7 @@ export default async function SuperAdminLayout({ children }: { children: React.R
     { href: '/superadmin/dashboard', label: 'Health Dashboard', icon: LayoutDashboard },
     { href: '/superadmin/users', label: 'User Management', icon: Users },
     { href: '/superadmin/activity', label: 'Activity Log', icon: Activity },
+    { href: '/superadmin/judges', label: 'Judge Tracker', icon: ClipboardCheck },
   ]
 
   return (
