@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
-import { Mail, Instagram, RefreshCw } from 'lucide-react'
+import { Mail, Instagram } from 'lucide-react'
 
 interface WinnerEntry { slot: number; entry: number; names: string }
 interface WinnerGroup { rank: number; total: number; entries: WinnerEntry[] }
@@ -38,7 +38,6 @@ export default function PublicResultsPage() {
   const [results, setResults] = useState<any[]>([])
   const [schools, setSchools] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
   const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   async function load() {
@@ -51,7 +50,6 @@ export default function PublicResultsPage() {
     ])
     setResults(res ?? [])
     setSchools(sc ?? [])
-    setLastRefreshed(new Date())
     setLoading(false)
   }
 
@@ -96,14 +94,7 @@ export default function PublicResultsPage() {
               <p className="text-brand-800 text-xs font-medium">Rotaract Club of MCE, Hassan</p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-brand-800/60">
-            {lastRefreshed && (
-              <>
-                <RefreshCw size={11} className="text-brand-400" />
-                <span>Updated {lastRefreshed.toLocaleTimeString()}</span>
-              </>
-            )}
-          </div>
+          <div />
         </div>
       </header>
 
