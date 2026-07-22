@@ -171,15 +171,16 @@ export default function PublicResultsPage() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-brand-50">
-                              {groups.map(g =>
-                                g.entries.map((e, i) => (
-                                  <tr key={`${g.rank}-${i}`} className={`${i === 0 && g.rank === 1 ? 'bg-amber-50/40' : ''}`}>
+                              {groups.map((g, gIdx) => {
+                                const displayRank = gIdx + 1
+                                return g.entries.map((e, i) => (
+                                  <tr key={`${displayRank}-${i}`} className={`${i === 0 && displayRank === 1 ? 'bg-amber-50/40' : ''}`}>
                                     {i === 0 && (
                                       <td className="px-5 py-3.5" rowSpan={g.entries.length}>
                                         <div className="flex items-center gap-2">
-                                          <span className="text-xl">{MEDAL_ICON[g.rank] ?? `#${g.rank}`}</span>
-                                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${RANK_BADGE[g.rank] ?? 'bg-gray-200 text-gray-700'}`}>
-                                            {RANK_LABEL[g.rank] ?? `#${g.rank}`}
+                                          <span className="text-xl">{MEDAL_ICON[displayRank] ?? `#${displayRank}`}</span>
+                                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${RANK_BADGE[displayRank] ?? 'bg-gray-200 text-gray-700'}`}>
+                                            {RANK_LABEL[displayRank] ?? `#${displayRank}`}
                                           </span>
                                         </div>
                                         {g.entries.length > 1 && (
@@ -201,7 +202,7 @@ export default function PublicResultsPage() {
                                     </td>
                                   </tr>
                                 ))
-                              )}
+                              })}
                             </tbody>
                           </table>
                         </div>
