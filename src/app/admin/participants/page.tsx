@@ -123,7 +123,7 @@ export default function AdminParticipantsPage() {
 
     const { data: existing, error: existErr } = await supabase.from('participants').select('entry_index').eq('slot_number', slotNum).eq('event_id', evId)
     if (existErr) { flash(`❌ Could not verify entry count: ${existErr.message}`); return }
-    const distinctEntries = new Set((existing ?? []).map((r: any) => r.entry_index)).size
+    const distinctEntries = new Set((existing ?? []).map((r: any) => r.entry_index ?? 1)).size
     if (distinctEntries >= (ev.max_entries ?? 1)) {
       const schoolName = schools.find(s => s.slot_number === slotNum)?.school_name ?? `Slot ${slotNum}`
       flash(`❌ ${schoolName} has already reached the maximum ${ev.max_entries} entries for ${ev.name}.`)
@@ -162,11 +162,11 @@ export default function AdminParticipantsPage() {
     setOnspots(prev => prev.map(o => o.id === id ? { ...o, amount_paid: !current } : o))
   }
 
-  async function deleteOnspot(o: { id: string; slot_number: number; event_id: string; participant_name: string }) {
+  async function deleteOnspot(o: { id: string; slot_number: number; event_id: string; participant_name: string; entry_index?: number }) {
     const res = await fetch('/api/admin/onspot-registration', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ onspotId: o.id, slotNumber: o.slot_number, eventId: o.event_id, participantName: o.participant_name }),
+      body: JSON.stringify({ onspotId: o.id, slotNumber: o.slot_number, eventId: o.event_id, participantName: o.participant_name, entryIndex: o.entry_index ?? 1 }),
     })
     if (!res.ok) { const j = await res.json(); flash(`❌ ${j.error ?? 'Delete failed'}`); return }
     setOnspots(prev => prev.filter(x => x.id !== o.id))

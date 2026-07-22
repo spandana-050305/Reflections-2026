@@ -117,11 +117,12 @@ export default function AdminManualMarksPage() {
 
     if (rows.length === 0) { showFlash('No scores to save.'); setSaving(false); return }
 
-    const { error: delErr } = await supabase.from('marks').delete().eq('event_id', selectedEvent.id)
-    if (delErr) { showFlash('Error saving: ' + delErr.message); setSaving(false); return }
-
-    const { error } = await supabase.from('marks').insert(rows)
-    if (error) { showFlash('Error saving: ' + error.message); setSaving(false); return }
+    const res = await fetch('/api/admin/save-marks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId: selectedEvent.id, rows }),
+    })
+    if (!res.ok) { const j = await res.json(); showFlash('Error saving: ' + (j.error ?? 'Unknown')); setSaving(false); return }
 
     showFlash('Marks saved ✓')
     const { data: freshMk } = await supabase.from('marks').select('*').eq('event_id', selectedEvent.id)
@@ -144,6 +145,12 @@ export default function AdminManualMarksPage() {
       return
     }
 
+    function getNamesForEntry(slot: number, entry: number): string {
+      return eventParticipants
+        .filter((p: any) => p.slot_number === slot && (p.entry_index ?? 1) === entry)
+        .map((p: any) => p.participant_name).filter(Boolean).join(', ')
+    }
+
     const sorted = [...eventMarkRows].sort((a, b) => Number(b.total) - Number(a.total))
     const groups: WinnerGroup[] = []
     let rank = 1, i = 0
@@ -152,7 +159,7 @@ export default function AdminManualMarksPage() {
       groups.push({
         rank,
         total: Number(sorted[i].total),
-        entries: tied.map(x => ({ slot: x.slot_number, entry: x.entry_index ?? 1, names: '' }))
+        entries: tied.map(x => ({ slot: x.slot_number, entry: x.entry_index ?? 1, names: getNamesForEntry(x.slot_number, x.entry_index ?? 1) }))
       })
       rank += 1; i += tied.length
     }
@@ -190,12 +197,15 @@ export default function AdminManualMarksPage() {
   async function clearEventMarks() {
     if (!selectedEvent) return
     if (!confirm(`Clear all marks for "${selectedEvent.name}"? This cannot be undone.`)) return
-    const { error: e1 } = await supabase.from('marks').delete().eq('event_id', selectedEvent.id)
-    if (e1) { showFlash('❌ Error clearing marks: ' + e1.message); return }
-    const { error: e2 } = await supabase.from('results').delete().eq('event_id', selectedEvent.id)
-    if (e2) { showFlash('❌ Error clearing results: ' + e2.message); return }
+    const res = await fetch('/api/admin/save-marks', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId: selectedEvent.id }),
+    })
+    if (!res.ok) { const j = await res.json(); showFlash('❌ Error clearing: ' + (j.error ?? 'Unknown')); return }
     showFlash('Marks and result cleared.')
     setEventMarks([])
+    setEventParticipants([])
     setMarksIndex(prev => { const s = new Set(prev); s.delete(selectedEvent.id); return s })
     await load()
   }

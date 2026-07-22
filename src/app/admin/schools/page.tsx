@@ -131,8 +131,12 @@ export default function AdminSchoolsPage() {
     const json = await res.json()
     setResetting(false)
     if (!res.ok) { showMsg(`❌ ${json.error ?? 'Reset failed'}`, 'error'); return }
-    // Update password_plain in schools table
-    await supabase.from('schools').update({ password_plain: resetPass }).eq('id', resetTarget.id)
+    // Update password_plain in schools table via service role (bypasses RLS)
+    await fetch('/api/admin/reset-club-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: resetTarget.user_id, email: resetTarget.email, newPassword: resetPass, updatePlain: true, schoolId: resetTarget.id }),
+    })
     setSchools(prev => prev.map(s => s.id === resetTarget.id ? { ...s, password_plain: resetPass } : s))
     showMsg(`Password reset for ${resetTarget.school_name} ✓`)
     setResetTarget(null)

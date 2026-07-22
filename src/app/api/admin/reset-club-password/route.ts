@@ -32,34 +32,34 @@ export async function POST(req: NextRequest) {
   const role = await getCallerRole()
   if (role !== 'final_year' && role !== 'super_admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
-  const { userId, email, newPassword } = await req.json()
+  const { userId, email, newPassword, updatePlain, schoolId } = await req.json()
   if (!newPassword || newPassword.length < 4) {
     return NextResponse.json({ error: 'Password must be at least 4 characters' }, { status: 400 })
   }
 
   const admin = adminClient()
 
-  // If we have userId, update directly
-  if (userId) {
-    const { error } = await admin.auth.admin.updateUserById(userId, {
-      password: newPassword,
-      email_confirm: true,
-    })
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ ok: true })
+  // Resolve auth user
+  let authUserId = userId
+  if (!authUserId) {
+    if (!email) return NextResponse.json({ error: 'Missing userId or email' }, { status: 400 })
+    const { data: listData, error: listErr } = await admin.auth.admin.listUsers()
+    if (listErr) return NextResponse.json({ error: listErr.message }, { status: 500 })
+    const authUser = listData.users.find((u: any) => u.email === email)
+    if (!authUser) return NextResponse.json({ error: 'Auth user not found — they may need to re-register' }, { status: 404 })
+    authUserId = authUser.id
   }
 
-  // Otherwise find by email
-  if (!email) return NextResponse.json({ error: 'Missing userId or email' }, { status: 400 })
-  const { data: listData, error: listErr } = await admin.auth.admin.listUsers()
-  if (listErr) return NextResponse.json({ error: listErr.message }, { status: 500 })
-  const authUser = listData.users.find((u: any) => u.email === email)
-  if (!authUser) return NextResponse.json({ error: 'Auth user not found — they may need to re-register' }, { status: 404 })
-
-  const { error } = await admin.auth.admin.updateUserById(authUser.id, {
+  const { error } = await admin.auth.admin.updateUserById(authUserId, {
     password: newPassword,
     email_confirm: true,
   })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Also update password_plain in schools table if requested
+  if (updatePlain && schoolId) {
+    await admin.from('schools').update({ password_plain: newPassword }).eq('id', schoolId)
+  }
+
   return NextResponse.json({ ok: true })
 }

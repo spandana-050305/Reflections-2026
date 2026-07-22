@@ -71,7 +71,7 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   if (!await authCheck()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { onspotId, slotNumber, eventId, participantName } = await request.json()
+  const { onspotId, slotNumber, eventId, participantName, entryIndex } = await request.json()
   const admin = adminClient()
 
   await admin.from('onspot_registrations').delete().eq('id', onspotId)
@@ -80,6 +80,7 @@ export async function DELETE(request: Request) {
     .eq('slot_number', slotNumber)
     .eq('event_id', eventId)
     .eq('participant_name', participantName)
+    .eq('entry_index', entryIndex ?? 1)
     .eq('member_index', 1)
 
   return NextResponse.json({ ok: true })

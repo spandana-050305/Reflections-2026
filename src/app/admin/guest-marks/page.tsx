@@ -155,9 +155,13 @@ export default function AdminGuestMarksPage() {
 
   async function savePoints() {
     setSavingPts(true)
-    const { error } = await supabase.from('settings').upsert({ id: 1, points_1st: draftPts.p1, points_2nd: draftPts.p2, points_3rd: draftPts.p3 }, { onConflict: 'id' })
+    const res = await fetch('/api/admin/update-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ points_1st: draftPts.p1, points_2nd: draftPts.p2, points_3rd: draftPts.p3 }),
+    })
     setSavingPts(false)
-    if (error) { flash(`❌ ${error.message}`); return }
+    if (!res.ok) { const j = await res.json(); flash(`❌ ${j.error ?? 'Failed to save points'}`); return }
     setShowPtsPanel(false)
     flash(`Points updated: 1st=${draftPts.p1} · 2nd=${draftPts.p2} · 3rd=${draftPts.p3}`)
   }
@@ -168,8 +172,9 @@ export default function AdminGuestMarksPage() {
     participants.forEach((p: any) => {
       if (!grouped[p.event_id]) grouped[p.event_id] = {}
       if (!grouped[p.event_id][p.slot_number]) grouped[p.event_id][p.slot_number] = {}
-      if (!grouped[p.event_id][p.slot_number][p.entry_index]) grouped[p.event_id][p.slot_number][p.entry_index] = []
-      grouped[p.event_id][p.slot_number][p.entry_index].push(p.participant_name)
+      const ei = p.entry_index ?? 1
+      if (!grouped[p.event_id][p.slot_number][ei]) grouped[p.event_id][p.slot_number][ei] = []
+      grouped[p.event_id][p.slot_number][ei].push(p.participant_name)
     })
     const out: Record<string, Record<string, string>> = {}
     Object.entries(grouped).forEach(([eid, slots]) => {
