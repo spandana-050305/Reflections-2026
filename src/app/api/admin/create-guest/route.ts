@@ -33,7 +33,7 @@ async function getCallerRole(): Promise<string | null> {
 export async function POST(req: NextRequest) {
   // Only final_year admins may call this
   const role = await getCallerRole()
-  if (role !== 'final_year') {
+  if (role !== 'final_year' && role !== 'super_admin') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
 
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const role = await getCallerRole()
-  if (role !== 'final_year') {
+  if (role !== 'final_year' && role !== 'super_admin') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
 

@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import {
   LayoutDashboard, ListChecks, Users,
-  TableProperties, Trophy, School, Megaphone, Settings, ClipboardCheck, UserCheck, Clock, XCircle, Pencil
+  TableProperties, Trophy, School, Megaphone, Settings, ClipboardCheck, UserCheck, Clock, XCircle, Pencil, ShieldCheck
 } from 'lucide-react'
 import NavBar from '@/components/layout/NavBar'
 import NavLink from '@/components/layout/NavLink'
@@ -11,39 +11,45 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-  if (user.user_metadata?.role !== 'final_year') redirect('/login')
+  const role = user.user_metadata?.role as string | undefined
+  if (role !== 'final_year' && role !== 'super_admin') redirect('/login')
 
   // Self-registered Final Years need approval before getting full access.
-  // Seeded / admin-created accounts have no club_accounts row → allowed through.
-  const { data: acct } = await supabase
-    .from('club_accounts')
-    .select('status')
-    .eq('email', user.email)
-    .limit(1)
-  const account = (acct ?? [])[0]
-  if (account && account.status !== 'approved') {
-    const rejected = account.status === 'rejected'
-    return (
-      <div className="min-h-screen flex flex-col">
-        <NavBar title="Final Year Portal" role="final_year" />
-        <main className="flex-1 flex items-center justify-center p-6">
-          <div className="card max-w-md w-full text-center space-y-4 py-10">
-            <div className={`mx-auto h-14 w-14 rounded-full flex items-center justify-center ${rejected ? 'bg-red-100' : 'bg-amber-100'}`}>
-              {rejected ? <XCircle size={26} className="text-red-600" /> : <Clock size={26} className="text-amber-600" />}
+  // Seeded / admin-created accounts and super_admin have no club_accounts row → allowed through.
+  if (role !== 'super_admin') {
+    const { data: acct } = await supabase
+      .from('club_accounts')
+      .select('status')
+      .eq('email', user.email)
+      .limit(1)
+    const account = (acct ?? [])[0]
+    if (account && account.status !== 'approved') {
+      const rejected = account.status === 'rejected'
+      return (
+        <div className="min-h-screen flex flex-col">
+          <NavBar title="Final Year Portal" role="final_year" />
+          <main className="flex-1 flex items-center justify-center p-6">
+            <div className="card max-w-md w-full text-center space-y-4 py-10">
+              <div className={`mx-auto h-14 w-14 rounded-full flex items-center justify-center ${rejected ? 'bg-red-100' : 'bg-amber-100'}`}>
+                {rejected ? <XCircle size={26} className="text-red-600" /> : <Clock size={26} className="text-amber-600" />}
+              </div>
+              <h2 className="text-xl font-bold text-gray-900">{rejected ? 'Request declined' : 'Awaiting approval'}</h2>
+              <p className="text-sm text-gray-500">
+                {rejected
+                  ? 'Your Final Year access request was not approved. Please contact the existing admin.'
+                  : 'Your Final Year access request is waiting to be approved by an existing admin.'}
+              </p>
             </div>
-            <h2 className="text-xl font-bold text-gray-900">{rejected ? 'Request declined' : 'Awaiting approval'}</h2>
-            <p className="text-sm text-gray-500">
-              {rejected
-                ? 'Your Final Year access request was not approved. Please contact the existing admin.'
-                : 'Your Final Year access request is waiting to be approved by an existing admin.'}
-            </p>
-          </div>
-        </main>
-      </div>
-    )
+          </main>
+        </div>
+      )
+    }
   }
 
+  const isSuperAdmin = role === 'super_admin'
+
   const navLinks = [
+    ...(isSuperAdmin ? [{ href: '/superadmin/users', label: 'User Management', icon: ShieldCheck }] : []),
     { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/admin/events', label: 'Events', icon: ListChecks },
     { href: '/admin/participants', label: 'Participants', icon: Users },
@@ -59,7 +65,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="min-h-screen flex flex-col">
-      <NavBar title="Final Year Portal" role="final_year" />
+      <NavBar title={isSuperAdmin ? 'Super Admin' : 'Final Year Portal'} role="final_year" />
       <div className="flex flex-1">
         <aside className="w-60 bg-white/50 backdrop-blur-xl border-r border-white/60 hidden md:flex flex-col">
           <nav className="p-3 space-y-1 flex-1">

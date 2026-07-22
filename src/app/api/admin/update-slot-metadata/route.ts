@@ -31,7 +31,7 @@ async function getCallerRole(): Promise<string | null> {
 // POST body: { updates: [{ userId: string, slotNumber: number }] }
 export async function POST(req: NextRequest) {
   const role = await getCallerRole()
-  if (role !== 'final_year') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  if (role !== 'final_year' && role !== 'super_admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
   const { updates } = await req.json() as { updates: { userId: string; slotNumber: number }[] }
   if (!Array.isArray(updates) || updates.length === 0) {

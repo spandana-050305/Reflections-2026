@@ -92,6 +92,7 @@ export default function LoginPage() {
       else if (role === 'club_member') window.location.href = '/club/dashboard'
       else if (role === 'final_year')  window.location.href = '/admin/dashboard'
       else if (role === 'guest')       window.location.href = '/guest/evaluate'
+      else if (role === 'super_admin') window.location.href = '/admin/dashboard'
       else {
         setError(`Role "${role ?? 'undefined'}" not recognised — contact the admin.`)
         setLoading(false)

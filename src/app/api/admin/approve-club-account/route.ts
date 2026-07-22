@@ -30,7 +30,7 @@ async function getCallerRole(): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   const role = await getCallerRole()
-  if (role !== 'final_year') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  if (role !== 'final_year' && role !== 'super_admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
   const { accountId, userId } = await req.json()
   if (!accountId) return NextResponse.json({ error: 'Missing accountId' }, { status: 400 })

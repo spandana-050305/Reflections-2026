@@ -31,7 +31,7 @@ async function getCallerRole(): Promise<string | null> {
 // POST — create a school (pre-confirmed auth user + DB row)
 export async function POST(req: NextRequest) {
   const role = await getCallerRole()
-  if (role !== 'final_year') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  if (role !== 'final_year' && role !== 'super_admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
   const { email, password, schoolName, slotNumber } = await req.json()
   if (!email || !password || !schoolName) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
 // DELETE — remove school auth user + all their data
 export async function DELETE(req: NextRequest) {
   const role = await getCallerRole()
-  if (role !== 'final_year') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  if (role !== 'final_year' && role !== 'super_admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
   const { schoolId, userId, slotNumber } = await req.json()
   if (!schoolId) return NextResponse.json({ error: 'Missing schoolId' }, { status: 400 })

@@ -37,19 +37,21 @@ export async function middleware(request: NextRequest) {
 
   // Already logged in → skip login/landing page, go to dashboard
   if (user && (pathname === '/' || pathname === '/login')) {
-    if (role === 'school')      return NextResponse.redirect(new URL('/school/dashboard', request.url))
-    if (role === 'club_member') return NextResponse.redirect(new URL('/club/dashboard', request.url))
-    if (role === 'final_year')  return NextResponse.redirect(new URL('/admin/dashboard', request.url))
-    if (role === 'guest')       return NextResponse.redirect(new URL('/guest/evaluate', request.url))
+    if (role === 'school')       return NextResponse.redirect(new URL('/school/dashboard', request.url))
+    if (role === 'club_member')  return NextResponse.redirect(new URL('/club/dashboard', request.url))
+    if (role === 'final_year')   return NextResponse.redirect(new URL('/admin/dashboard', request.url))
+    if (role === 'guest')        return NextResponse.redirect(new URL('/guest/evaluate', request.url))
+    if (role === 'super_admin')  return NextResponse.redirect(new URL('/admin/dashboard', request.url))
   }
 
   // Portal protection — wrong role gets kicked back to login
   if (user) {
-    if (pathname.startsWith('/school') && role !== 'school')      return NextResponse.redirect(new URL('/login', request.url))
-    if (pathname.startsWith('/club')   && role !== 'club_member') return NextResponse.redirect(new URL('/login', request.url))
-    if (pathname.startsWith('/admin')  && role !== 'final_year')  return NextResponse.redirect(new URL('/login', request.url))
-    if (pathname.startsWith('/guest')  && role !== 'guest')       return NextResponse.redirect(new URL('/login', request.url))
-    if (pathname.startsWith('/judge')  && role !== 'guest')       return NextResponse.redirect(new URL('/login', request.url))
+    if (pathname.startsWith('/school')      && role !== 'school')                                          return NextResponse.redirect(new URL('/login', request.url))
+    if (pathname.startsWith('/club')        && role !== 'club_member')                                     return NextResponse.redirect(new URL('/login', request.url))
+    if (pathname.startsWith('/admin')       && role !== 'final_year' && role !== 'super_admin')            return NextResponse.redirect(new URL('/login', request.url))
+    if (pathname.startsWith('/superadmin')  && role !== 'super_admin')                                     return NextResponse.redirect(new URL('/login', request.url))
+    if (pathname.startsWith('/guest')       && role !== 'guest')                                           return NextResponse.redirect(new URL('/login', request.url))
+    if (pathname.startsWith('/judge')       && role !== 'guest')                                           return NextResponse.redirect(new URL('/login', request.url))
   }
 
   return response
