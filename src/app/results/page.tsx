@@ -174,6 +174,7 @@ export default function PublicResultsPage() {
                                 <th className="text-left px-5 py-2.5 text-xs font-semibold text-brand-800/50 uppercase tracking-wide w-32">Position</th>
                                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-800/50 uppercase tracking-wide">Participant</th>
                                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-800/50 uppercase tracking-wide">School</th>
+                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-800/50 uppercase tracking-wide w-20">Slot</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-brand-50">
@@ -198,6 +199,9 @@ export default function PublicResultsPage() {
                                     </td>
                                     <td className="px-4 py-3.5 text-brand-800/70">
                                       {getSchoolName(e.slot)}
+                                    </td>
+                                    <td className="px-4 py-3.5 text-brand-500 font-semibold text-sm">
+                                      {e.slot}
                                     </td>
                                   </tr>
                                 ))
