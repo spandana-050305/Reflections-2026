@@ -150,8 +150,12 @@ export default function AdminEventsPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this event? This will also delete all participant entries for it.')) return
-    const { error } = await supabase.from('events').delete().eq('id', id)
-    if (error) { setMessage(`❌ ${error.message}`); return }
+    const res = await fetch('/api/admin/delete-event', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId: id }),
+    })
+    if (!res.ok) { const j = await res.json(); setMessage(`❌ ${j.error ?? 'Delete failed'}`); return }
     setEvents(prev => prev.filter(e => e.id !== id))
   }
 
