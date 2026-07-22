@@ -106,9 +106,11 @@ export default function PublicResultsPage() {
             Reflections'26
           </h2>
           <p className="text-brand-800/80 text-base leading-relaxed">
-            Reflections is the flagship inter-school cultural event organized by the Rotaract Club of MCE, Hassan.
+            Reflections is the flagship inter-school event organized by the Rotaract Club of MCE, Hassan.
             For over a decade, it has brought together talented students from schools across the region to showcase
             their creativity, knowledge, and skills through a wide range of competitions.
+            With 60+ events, participation from 60+ schools, and 1,000+ participants, Reflections has become a
+            platform that inspires learning, healthy competition, teamwork, and confidence among young minds.
           </p>
           <div className="flex flex-wrap justify-center gap-4 pt-2">
             {[['60+', 'Events'], ['60+', 'Schools'], ['1,000+', 'Participants']].map(([num, label]) => (
