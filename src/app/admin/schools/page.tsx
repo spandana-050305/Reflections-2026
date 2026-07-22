@@ -267,6 +267,7 @@ export default function AdminSchoolsPage() {
   if (loading) return <PageSpinner />
 
   return (
+    <>
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-2xl font-bold text-gray-900">Schools</h2>
@@ -428,6 +429,7 @@ export default function AdminSchoolsPage() {
 
     {/* Reset Password Modal */}
     {resetTarget && (
+
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm space-y-4">
           <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -457,5 +459,6 @@ export default function AdminSchoolsPage() {
         </div>
       </div>
     )}
+    </>
   )
 }
