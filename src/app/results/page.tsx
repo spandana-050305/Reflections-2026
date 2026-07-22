@@ -28,9 +28,9 @@ const RANK_STYLE: Record<number, string> = {
   3: 'bg-orange-50 border-orange-200 text-orange-900',
 }
 const RANK_BADGE: Record<number, string> = {
-  1: 'bg-amber-400 text-white',
-  2: 'bg-gray-400 text-white',
-  3: 'bg-orange-400 text-white',
+  1: 'bg-brand-600 text-white',
+  2: 'bg-brand-400 text-white',
+  3: 'bg-brand-300 text-brand-900',
 }
 
 export default function PublicResultsPage() {
@@ -92,7 +92,7 @@ export default function PublicResultsPage() {
               </div>
             </div>
             <div className="leading-tight">
-              <h1 className="font-bold text-brand-600 text-xl tracking-tight">Reflections<span className="text-brand-400">'26</span></h1>
+              <h1 className="font-bold text-brand-500 text-xl tracking-tight">Reflections'26</h1>
               <p className="text-brand-800 text-xs font-medium">Rotaract Club of MCE, Hassan</p>
             </div>
           </div>
@@ -111,8 +111,8 @@ export default function PublicResultsPage() {
 
         {/* About section */}
         <section className="text-center space-y-4 max-w-2xl mx-auto">
-          <h2 className="text-3xl sm:text-4xl font-bold text-brand-900">
-            Reflections<span className="text-brand-500">'26</span>
+          <h2 className="text-3xl sm:text-4xl font-bold text-brand-500">
+            Reflections'26
           </h2>
           <p className="text-brand-800/80 text-base leading-relaxed">
             Reflections is the flagship inter-school cultural event organized by the Rotaract Club of MCE, Hassan.
