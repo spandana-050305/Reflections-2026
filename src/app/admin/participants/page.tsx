@@ -132,26 +132,17 @@ export default function AdminParticipantsPage() {
 
     const nextEntry = distinctEntries + 1
     setOnspotSaving(true)
-    const { data: insertedOnspot, error: onspotErr } = await supabase.from('onspot_registrations').insert({
-      slot_number: slotNum, event_id: evId,
-      participant_name: onspotForm.participant_name.trim(),
-      amount_paid: onspotForm.amount_paid,
-      created_at: new Date().toISOString(),
-    }).select('id').single()
-    if (onspotErr) { flash(`❌ ${onspotErr.message}`); setOnspotSaving(false); return }
-
-    const { error: partErr } = await supabase.from('participants').insert({
-      slot_number: slotNum, event_id: evId,
-      participant_name: onspotForm.participant_name.trim(),
-      entry_index: nextEntry, member_index: 1,
-      created_at: new Date().toISOString(),
+    const res = await fetch('/api/admin/onspot-registration', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        slotNumber: slotNum, eventId: evId,
+        participantName: onspotForm.participant_name.trim(),
+        amountPaid: onspotForm.amount_paid,
+        entryIndex: nextEntry,
+      }),
     })
-    if (partErr) {
-      await supabase.from('onspot_registrations').delete().eq('id', insertedOnspot.id)
-      flash(`❌ ${partErr.message}`)
-      setOnspotSaving(false)
-      return
-    }
+    if (!res.ok) { const j = await res.json(); flash(`❌ ${j.error ?? 'Registration failed'}`); setOnspotSaving(false); return }
 
     setOnspotForm({ slot_number: '', participant_name: '', event_id: '', amount_paid: false })
     setEventSearch('')
@@ -162,22 +153,23 @@ export default function AdminParticipantsPage() {
   }
 
   async function toggleAmountPaid(id: string, current: boolean) {
-    const { error } = await supabase.from('onspot_registrations').update({ amount_paid: !current }).eq('id', id)
-    if (error) { flash(`❌ ${error.message}`); return }
-    loadOnspots()
+    const res = await fetch('/api/admin/onspot-registration', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ onspotId: id, amountPaid: !current }),
+    })
+    if (!res.ok) { flash('❌ Update failed'); return }
+    setOnspots(prev => prev.map(o => o.id === id ? { ...o, amount_paid: !current } : o))
   }
 
   async function deleteOnspot(o: { id: string; slot_number: number; event_id: string; participant_name: string }) {
-    const { error: delOnspotErr } = await supabase.from('onspot_registrations').delete().eq('id', o.id)
-    if (delOnspotErr) { flash(`❌ ${delOnspotErr.message}`); return }
-    const { error: delPartErr } = await supabase.from('participants')
-      .delete()
-      .eq('slot_number', o.slot_number)
-      .eq('event_id', o.event_id)
-      .eq('participant_name', o.participant_name)
-      .eq('member_index', 1)
-    if (delPartErr) { flash(`❌ ${delPartErr.message}`); return }
-    loadOnspots()
+    const res = await fetch('/api/admin/onspot-registration', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ onspotId: o.id, slotNumber: o.slot_number, eventId: o.event_id, participantName: o.participant_name }),
+    })
+    if (!res.ok) { const j = await res.json(); flash(`❌ ${j.error ?? 'Delete failed'}`); return }
+    setOnspots(prev => prev.filter(x => x.id !== o.id))
     if (selectedEvent === o.event_id) loadParticipants(selectedEvent)
   }
 
