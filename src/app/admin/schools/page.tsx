@@ -39,6 +39,9 @@ export default function AdminSchoolsPage() {
   const [showShuffleWarning, setShowShuffleWarning] = useState(false)
   const [showAllCreds, setShowAllCreds] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [resetTarget, setResetTarget] = useState<any | null>(null)
+  const [resetPass, setResetPass] = useState('')
+  const [resetting, setResetting] = useState(false)
   const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => () => { if (msgTimer.current) clearTimeout(msgTimer.current) }, [])
@@ -54,9 +57,9 @@ export default function AdminSchoolsPage() {
 
   useEffect(() => { load() }, [])
 
+  // Only update the email when school name changes; keep the same password throughout
   useEffect(() => {
     setPreviewEmail(generateEmail(form.school_name))
-    setPreviewPass(generatePassword())
   }, [form.school_name])
 
   function showMsg(text: string, type: 'success' | 'error' = 'success') {
@@ -68,6 +71,7 @@ export default function AdminSchoolsPage() {
 
   function openCreateForm() {
     setForm({ school_name: '', slot_number: '' })
+    setPreviewPass(generatePassword())
     setShowForm(true)
   }
 
@@ -114,6 +118,25 @@ export default function AdminSchoolsPage() {
     })
     if (!res.ok) { showMsg(`❌ Delete failed (${res.status})`, 'error'); return }
     setSchools(prev => prev.filter(s => s.id !== school.id))
+  }
+
+  async function handleResetPassword() {
+    if (!resetTarget || !resetPass) return
+    setResetting(true)
+    const res = await fetch('/api/admin/reset-club-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: resetTarget.user_id, email: resetTarget.email, newPassword: resetPass }),
+    })
+    const json = await res.json()
+    setResetting(false)
+    if (!res.ok) { showMsg(`❌ ${json.error ?? 'Reset failed'}`, 'error'); return }
+    // Update password_plain in schools table
+    await supabase.from('schools').update({ password_plain: resetPass }).eq('id', resetTarget.id)
+    setSchools(prev => prev.map(s => s.id === resetTarget.id ? { ...s, password_plain: resetPass } : s))
+    showMsg(`Password reset for ${resetTarget.school_name} ✓`)
+    setResetTarget(null)
+    setResetPass('')
   }
 
   async function handleShuffle() {
@@ -388,6 +411,9 @@ export default function AdminSchoolsPage() {
                     <button onClick={() => downloadSchoolExcel(s)} className="text-xs text-brand-600 hover:underline flex items-center gap-1">
                       <FileDown size={12} /> Excel
                     </button>
+                    <button onClick={() => { setResetTarget(s); setResetPass(generatePassword()) }} className="text-xs text-amber-600 hover:underline flex items-center gap-1">
+                      <KeyRound size={12} /> Reset Password
+                    </button>
                     <button onClick={() => handleDelete(s)} className="text-xs text-red-500 hover:underline flex items-center gap-1">
                       <Trash2 size={12} /> Delete
                     </button>
@@ -399,5 +425,37 @@ export default function AdminSchoolsPage() {
         </table>
       </div>
     </div>
+
+    {/* Reset Password Modal */}
+    {resetTarget && (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm space-y-4">
+          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <KeyRound size={18} className="text-amber-500" /> Reset Password
+          </h3>
+          <p className="text-sm text-gray-500">
+            New password for <span className="font-mono font-medium text-gray-700">{resetTarget.school_name}</span>
+            <br /><span className="text-xs text-gray-400">{resetTarget.email}</span>
+          </p>
+          <input
+            type="text"
+            value={resetPass}
+            onChange={e => setResetPass(e.target.value)}
+            className="input w-full font-mono"
+            autoFocus
+          />
+          <div className="flex gap-2 justify-end">
+            <button onClick={() => setResetTarget(null)} className="btn-secondary text-sm px-4 py-2">Cancel</button>
+            <button
+              onClick={handleResetPassword}
+              disabled={resetPass.length < 4 || resetting}
+              className="btn-primary text-sm px-4 py-2"
+            >
+              {resetting ? 'Resetting…' : 'Reset'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
   )
 }
