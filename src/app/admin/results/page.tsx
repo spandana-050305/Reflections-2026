@@ -89,7 +89,7 @@ export default function AdminResultsPage() {
     while (i < sorted.length && groups.length < 3) {
       const tied = sorted.filter(x => x.total === sorted[i].total)
       groups.push({ rank, total: Number(sorted[i].total), entries: tied.map(x => ({ slot: x.slot_number, entry: x.entry_index ?? 1, names: '' })) })
-      rank += tied.length; i += tied.length
+      rank += 1; i += tied.length
     }
 
     const { error } = await supabase.from('results').upsert({
