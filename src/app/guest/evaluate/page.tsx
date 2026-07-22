@@ -130,12 +130,18 @@ export default function GuestEvaluatePage() {
     if (!event) return
     setSubmitError('')
 
-    // Persist the assignees entered for this event.
+    // Persist the assignees entered for this event via server-side API route.
     const cleanAssignees = assignees.map(a => a.trim()).filter(Boolean)
-    const { error: updateErr } = await supabase.from('events')
-      .update({ assigned_members: cleanAssignees.length > 0 ? cleanAssignees : null })
-      .eq('id', event.id)
-    if (updateErr) { setSubmitError(`Failed to save assignees: ${updateErr.message}`); return }
+    const assigneeRes = await fetch('/api/guest/update-assignees', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId: event.id, assignedMembers: cleanAssignees.length > 0 ? cleanAssignees : null }),
+    })
+    if (!assigneeRes.ok) {
+      const j = await assigneeRes.json().catch(() => ({}))
+      setSubmitError(`Failed to save assignees: ${j.error ?? 'Unknown error'}`)
+      return
+    }
 
     // Look for marks this judge has already submitted for this event.
     const { data: existing, error: fetchErr } = await supabase

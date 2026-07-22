@@ -49,6 +49,7 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith('/club')   && role !== 'club_member') return NextResponse.redirect(new URL('/login', request.url))
     if (pathname.startsWith('/admin')  && role !== 'final_year')  return NextResponse.redirect(new URL('/login', request.url))
     if (pathname.startsWith('/guest')  && role !== 'guest')       return NextResponse.redirect(new URL('/login', request.url))
+    if (pathname.startsWith('/judge')  && role !== 'guest')       return NextResponse.redirect(new URL('/login', request.url))
   }
 
   return response

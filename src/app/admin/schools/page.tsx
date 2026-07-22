@@ -145,6 +145,7 @@ export default function AdminSchoolsPage() {
         supabase.from('participants').update({ slot_number: tempSlot }).eq('slot_number', oldSlots[i]),
         supabase.from('marks').update({ slot_number: tempSlot }).eq('slot_number', oldSlots[i]),
         supabase.from('guest_marks').update({ slot_number: tempSlot }).eq('slot_number', oldSlots[i]),
+        supabase.from('onspot_registrations').update({ slot_number: tempSlot }).eq('slot_number', oldSlots[i]),
       ])
       const firstErr = results.find(r => r.error)?.error
       if (firstErr) {
@@ -163,6 +164,7 @@ export default function AdminSchoolsPage() {
         supabase.from('participants').update({ slot_number: newSlots[i] }).eq('slot_number', tempSlot),
         supabase.from('marks').update({ slot_number: newSlots[i] }).eq('slot_number', tempSlot),
         supabase.from('guest_marks').update({ slot_number: newSlots[i] }).eq('slot_number', tempSlot),
+        supabase.from('onspot_registrations').update({ slot_number: newSlots[i] }).eq('slot_number', tempSlot),
       ])
       const firstErr = results.find(r => r.error)?.error
       if (firstErr) {

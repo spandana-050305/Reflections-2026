@@ -95,18 +95,7 @@ export default function EventDetailPage() {
     setSaving(true)
     setMessage('')
 
-    // Delete existing, then insert fresh
-    const { error: deleteError } = await supabase.from('participants')
-      .delete()
-      .eq('event_id', eventId)
-      .eq('slot_number', slotNumber)
-
-    if (deleteError) {
-      showMessage(`❌ Error clearing old entries: ${deleteError.message}`)
-      setSaving(false)
-      return
-    }
-
+    // Build rows first — if empty, warn before wiping existing data
     const rows = []
     for (let eIdx = 0; eIdx < entries.length; eIdx++) {
       for (let mIdx = 0; mIdx < entries[eIdx].members.length; mIdx++) {
@@ -123,14 +112,29 @@ export default function EventDetailPage() {
       }
     }
 
-    if (rows.length > 0) {
-      const { error } = await supabase.from('participants').insert(rows)
-      if (error) {
-        showMessage(`❌ Error: ${error.message}`)
-        console.error('[Save] insert error:', error)
-        setSaving(false)
-        return
-      }
+    if (rows.length === 0) {
+      showMessage('❌ No participant names entered. Please add at least one name before saving.')
+      setSaving(false)
+      return
+    }
+
+    // Delete existing, then insert fresh
+    const { error: deleteError } = await supabase.from('participants')
+      .delete()
+      .eq('event_id', eventId)
+      .eq('slot_number', slotNumber)
+
+    if (deleteError) {
+      showMessage(`❌ Error clearing old entries: ${deleteError.message}`)
+      setSaving(false)
+      return
+    }
+
+    const { error } = await supabase.from('participants').insert(rows)
+    if (error) {
+      showMessage(`❌ Error saving participants: ${error.message}. Your previous entries may have been lost — please re-enter and save again.`)
+      setSaving(false)
+      return
     }
 
     showMessage('Saved successfully!')
