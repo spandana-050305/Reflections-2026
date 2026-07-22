@@ -2,14 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { Pencil, Trash2, Check, X, FileDown, ClipboardList, Users, CheckCircle2, XCircle } from 'lucide-react'
+import { Pencil, Trash2, Check, X, FileDown, ClipboardList, Users, CheckCircle2, XCircle, Search } from 'lucide-react'
 import PageSpinner from '@/components/layout/PageSpinner'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 import type { Category, Event } from '@/lib/types'
 
-type Tab = 'participants' | 'onspot'
+type Tab = 'participants' | 'onspot' | 'search'
 
 export default function AdminParticipantsPage() {
   const supabase = createClient()
@@ -28,6 +28,9 @@ export default function AdminParticipantsPage() {
   const [editName, setEditName] = useState('')
 
   // On-spot tab
+  const [searchQuery, setSearchQuery] = useState('')
+  const [allParticipants, setAllParticipants] = useState<any[]>([])
+  const [searchLoaded, setSearchLoaded] = useState(false)
   const [onspots, setOnspots] = useState<any[]>([])
   const [onspotForm, setOnspotForm] = useState({ slot_number: '', participant_name: '', event_id: '', amount_paid: false })
   const [onspotSaving, setOnspotSaving] = useState(false)
@@ -76,6 +79,17 @@ export default function AdminParticipantsPage() {
     const { data, error } = await supabase.from('onspot_registrations').select('*').order('created_at', { ascending: false })
     if (error) { flash(`❌ Failed to load on-spot registrations: ${error.message}`); return }
     setOnspots(data ?? [])
+  }
+
+  async function loadAllParticipants() {
+    if (searchLoaded) return
+    const { data, error } = await supabase
+      .from('participants')
+      .select('*, events(name, categories(name))')
+      .order('participant_name')
+    if (error) { flash(`❌ ${error.message}`); return }
+    setAllParticipants(data ?? [])
+    setSearchLoaded(true)
   }
 
   useEffect(() => { load(); loadOnspots() }, [])
@@ -329,6 +343,10 @@ export default function AdminParticipantsPage() {
           className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-medium ${tab==='onspot' ? 'bg-brand-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
           <Users size={15} /> On-Spot
         </button>
+        <button onClick={() => { setTab('search'); loadAllParticipants() }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-medium ${tab==='search' ? 'bg-brand-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
+          <Search size={15} /> Search
+        </button>
       </div>
 
       {tab === 'participants' && (
@@ -405,6 +423,53 @@ export default function AdminParticipantsPage() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {tab === 'search' && (
+        <div className="space-y-5">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="input pl-9 w-full"
+              placeholder="Search participant name…"
+              autoFocus
+            />
+          </div>
+
+          {!searchLoaded ? (
+            <div className="card text-center text-gray-400 py-8">Loading all participants…</div>
+          ) : searchQuery.trim().length < 2 ? (
+            <div className="card text-center text-gray-400 py-8">Type at least 2 characters to search.</div>
+          ) : (() => {
+            const q = searchQuery.trim().toLowerCase()
+            const found = allParticipants.filter(p =>
+              p.participant_name.toLowerCase().includes(q)
+            )
+            if (found.length === 0) return (
+              <div className="card text-center text-gray-400 py-8">No participants found for "{searchQuery}".</div>
+            )
+            return (
+              <div className="card p-0 overflow-hidden divide-y divide-gray-50">
+                {found.map(p => (
+                  <div key={p.id} className="flex items-center justify-between px-4 py-3 gap-3">
+                    <div>
+                      <p className="font-medium text-gray-800">{p.participant_name}</p>
+                      <p className="text-xs text-gray-400">
+                        {p.events?.categories?.name ?? '—'} · {p.events?.name ?? p.event_id}
+                        {' '} · Slot {p.slot_number} — {schoolMap[p.slot_number] ?? '—'}
+                        {' '} · Entry {p.entry_index}
+                        {p.member_index > 1 && `, Member ${p.member_index}`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                <div className="px-4 py-2 text-xs text-gray-400 bg-gray-50">{found.length} result{found.length !== 1 ? 's' : ''}</div>
+              </div>
+            )
+          })()}
         </div>
       )}
 

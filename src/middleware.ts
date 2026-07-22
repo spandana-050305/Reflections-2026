@@ -30,8 +30,9 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const role = user?.user_metadata?.role as string | undefined
 
-  // Not logged in → send to login page (allow landing page and login page through)
-  if (!user && pathname !== '/' && pathname !== '/login') {
+  // Public routes — no login required
+  const publicRoutes = ['/', '/login', '/results']
+  if (!user && !publicRoutes.some(r => pathname === r || pathname.startsWith('/results'))) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 

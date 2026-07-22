@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import {
   LayoutDashboard, ListChecks, Users,
-  TableProperties, Trophy, School, Megaphone, Settings, ClipboardCheck, UserCheck, Clock, XCircle, Pencil, ShieldCheck
+  TableProperties, Trophy, School, Megaphone, Settings, ClipboardCheck, UserCheck, Clock, XCircle, Pencil, ShieldCheck, Grid3x3
 } from 'lucide-react'
 import NavBar from '@/components/layout/NavBar'
 import NavLink from '@/components/layout/NavLink'
@@ -55,6 +55,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin/participants', label: 'Participants', icon: Users },
     { href: '/admin/manual-marks', label: 'Manual Marks', icon: Pencil },
     { href: '/admin/guest-marks', label: 'Guest Marks', icon: ClipboardCheck },
+    { href: '/admin/judges', label: 'Judge Tracker', icon: Grid3x3 },
     { href: '/admin/points', label: 'Points Table', icon: TableProperties },
     { href: '/admin/results', label: 'Results', icon: Trophy },
     { href: '/admin/schools', label: 'Schools', icon: School },

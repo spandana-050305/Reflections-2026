@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { Trophy, Lock, CheckCircle2, Clock } from 'lucide-react'
+import { Trophy, Lock, CheckCircle2, Clock, FileDown, User } from 'lucide-react'
 import type { Category, Event } from '@/lib/types'
 import PageSpinner from '@/components/layout/PageSpinner'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 interface WinnerEntry { slot: number; entry: number; names: string }
 interface WinnerGroup { rank: number; total: number; entries: WinnerEntry[] }
@@ -32,6 +34,7 @@ export default function AdminResultsPage() {
   const [selectedCat, setSelectedCat] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
+  const [currentUserEmail, setCurrentUserEmail] = useState('')
   const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function showMessage(text: string) {
@@ -44,6 +47,10 @@ export default function AdminResultsPage() {
   const [rankPts, setRankPts] = useState<Record<number, number>>({ 1: 15, 2: 10, 3: 5 })
 
   async function load() {
+    // Get current user for audit trail
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user?.email) setCurrentUserEmail(user.email)
+
     const [
       { data: cats, error: catsErr },
       { data: evs,  error: evsErr  },
@@ -92,6 +99,8 @@ export default function AdminResultsPage() {
       third_slot: groups[2]?.entries[0]?.slot ?? null,
       winners_json: JSON.stringify(groups),
       published: false,
+      computed_by_email: currentUserEmail || null,
+      computed_at: new Date().toISOString(),
     }, { onConflict: 'event_id' })
     setComputing(null)
     if (error) { showMessage(`❌ ${error.message}`); return }
@@ -113,18 +122,72 @@ export default function AdminResultsPage() {
     await load()
   }
 
+  function exportResultsPDF() {
+    const eventsInCatForPDF = events.filter(e => e.category_id === selectedCat)
+    const catName = categories.find(c => c.id === selectedCat)?.name ?? 'Results'
+    const doc = new jsPDF()
+
+    doc.setFontSize(20)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Reflections Cultural Event', 14, 20)
+    doc.setFontSize(13)
+    doc.setTextColor(100)
+    doc.text(`${catName} — Results`, 14, 28)
+    doc.setFontSize(9)
+    doc.text(`Exported on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`, 14, 35)
+    doc.setTextColor(0)
+
+    let y = 44
+    const MEDALS_TEXT: Record<number, string> = { 1: '1st Place', 2: '2nd Place', 3: '3rd Place' }
+
+    eventsInCatForPDF.forEach(ev => {
+      const result = results.find(r => r.event_id === ev.id)
+      const winnerGroups = result ? parseWinners(result) : []
+      if (winnerGroups.length === 0) return
+
+      const rows = winnerGroups.flatMap(g =>
+        g.entries.map(e => [
+          MEDALS_TEXT[g.rank] ?? `#${g.rank}`,
+          `Slot ${e.slot}`,
+          getSchoolName(e.slot),
+          e.names || '',
+          g.total > 0 ? `${g.total}` : '',
+        ])
+      )
+
+      autoTable(doc, {
+        startY: y,
+        head: [[{ content: ev.name + (result?.published ? ' ✓ Published' : ' (Draft)'), colSpan: 5, styles: { fillColor: [219, 39, 119], textColor: 255, fontStyle: 'bold', fontSize: 10 } }],
+               ['Place', 'Slot', 'School', 'Names', 'Score']],
+        body: rows,
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: [248, 113, 113], textColor: 255 },
+        alternateRowStyles: { fillColor: [253, 242, 248] },
+        didDrawPage: (data) => { y = data.cursor?.y ?? y },
+      })
+      y = (doc as any).lastAutoTable.finalY + 8
+    })
+
+    doc.save(`results-${catName.toLowerCase().replace(/\s+/g, '-')}.pdf`)
+  }
+
   if (loading) return <PageSpinner />
 
   const eventsInCat = events.filter(e => e.category_id === selectedCat)
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
-      <div className="flex items-center gap-3">
-        <Trophy className="text-brand-600" size={24} />
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Results</h2>
-          <p className="text-gray-500 text-sm">Winners auto-computed from marks · ties handled · names shown</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <Trophy className="text-brand-600" size={24} />
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Results</h2>
+            <p className="text-gray-500 text-sm">Winners auto-computed from marks · ties handled · names shown</p>
+          </div>
         </div>
+        <button onClick={exportResultsPDF} className="btn-secondary flex items-center gap-2 text-sm">
+          <FileDown size={15} /> Export PDF
+        </button>
       </div>
 
       {message && (
@@ -245,15 +308,24 @@ export default function AdminResultsPage() {
                   )}
                 </div>
 
-                {/* Publish / Unpublish */}
+                {/* Publish / Unpublish + Audit trail */}
                 {result && (
-                  <div className="shrink-0 mt-4 flex gap-2">
+                  <div className="shrink-0 mt-1 flex flex-col items-end gap-2">
                     <button
                       onClick={() => togglePublish(ev.id, result.published)}
                       className={result.published ? 'btn-danger' : 'btn-primary'}
                     >
                       {result.published ? 'Unpublish' : 'Publish Results'}
                     </button>
+                    {result.computed_by_email && (
+                      <div className="flex items-center gap-1 text-xs text-gray-400">
+                        <User size={10} />
+                        <span>{result.computed_by_email}</span>
+                        {result.computed_at && (
+                          <span>· {new Date(result.computed_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
