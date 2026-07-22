@@ -360,7 +360,7 @@ export default function AdminGuestMarksPage() {
     while (i < seList.length && groups.length < 3) {
       const tied = seList.filter(x => x.total === seList[i].total)
       groups.push({ rank, total: seList[i].total, entries: tied.map(x => ({ slot: x.slot, entry: x.entry, names: x.names })) })
-      rank += tied.length; i += tied.length
+      rank += 1; i += tied.length
     }
     const { error: upsertErr } = await supabase.from('results').upsert({
       event_id: eventId,
