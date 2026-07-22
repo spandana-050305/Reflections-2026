@@ -113,7 +113,7 @@ export default function AdminSchoolsPage() {
       body: JSON.stringify({ schoolId: school.id, userId: school.user_id, slotNumber: school.slot_number }),
     })
     if (!res.ok) { showMsg(`❌ Delete failed (${res.status})`, 'error'); return }
-    await load()
+    setSchools(prev => prev.filter(s => s.id !== school.id))
   }
 
   async function handleShuffle() {

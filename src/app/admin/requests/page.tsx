@@ -67,7 +67,7 @@ export default function AdminRequestsPage() {
       if (error) { flash(`❌ ${error.message}`); setBusy(null); return }
     }
 
-    await load()
+    setAccounts(prev => prev.map(a => a.id === acct.id ? { ...a, status, reviewed_at: new Date().toISOString() } : a))
     flash(`${acct.name} ${status === 'approved' ? 'approved ✓ — they can now log in' : status === 'rejected' ? 'rejected' : 'updated'} ✓`)
     setBusy(null)
   }
@@ -97,7 +97,7 @@ export default function AdminRequestsPage() {
       body: JSON.stringify({ accountId: acct.id, email: acct.email }),
     })
     if (!res.ok) { flash(`❌ Delete failed (${res.status})`); setBusy(null); return }
-    await load()
+    setAccounts(prev => prev.filter(a => a.id !== acct.id))
     flash(`${acct.name}'s request deleted ✓`)
     setBusy(null)
   }

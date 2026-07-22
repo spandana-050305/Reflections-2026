@@ -152,7 +152,7 @@ export default function AdminEventsPage() {
     if (!confirm('Delete this event? This will also delete all participant entries for it.')) return
     const { error } = await supabase.from('events').delete().eq('id', id)
     if (error) { setMessage(`❌ ${error.message}`); return }
-    await load()
+    setEvents(prev => prev.filter(e => e.id !== id))
   }
 
   if (loading) return <PageSpinner />
