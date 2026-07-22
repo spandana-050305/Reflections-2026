@@ -151,7 +151,7 @@ export default function PublicResultsPage() {
                 {/* Category heading */}
                 <div className="flex items-center gap-3">
                   <div className="h-px flex-1 bg-brand-200" />
-                  <h4 className="text-sm font-bold uppercase tracking-widest text-brand-500 px-3">{catName}</h4>
+                  <h4 className="text-sm font-bold uppercase tracking-widest text-brand-500 px-3">Category {catName.toUpperCase()}</h4>
                   <div className="h-px flex-1 bg-brand-200" />
                 </div>
 
