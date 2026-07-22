@@ -18,6 +18,7 @@ export default function AdminManualMarksPage() {
   const [marksIndex, setMarksIndex] = useState<Set<string>>(new Set())
   const [eventMarks, setEventMarks] = useState<any[]>([])
   const [results, setResults] = useState<Record<string, any>>({}) // eventId → result row
+  const [eventParticipants, setEventParticipants] = useState<any[]>([]) // participants for selected event
 
   const [selectedCat, setSelectedCat] = useState('')
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
@@ -68,27 +69,34 @@ export default function AdminManualMarksPage() {
   useEffect(() => { load() }, [])
 
   useEffect(() => {
-    if (!selectedEvent) { setEventMarks([]); return }
-    supabase.from('marks').select('*').eq('event_id', selectedEvent.id)
-      .then(({ data, error }) => {
-        if (error) { showFlash(`❌ ${error.message}`); return }
-        setEventMarks(data ?? [])
-      })
+    if (!selectedEvent) { setEventMarks([]); setEventParticipants([]); return }
+    Promise.all([
+      supabase.from('marks').select('*').eq('event_id', selectedEvent.id),
+      supabase.from('participants').select('slot_number, entry_index, participant_name, member_index')
+        .eq('event_id', selectedEvent.id).order('slot_number').order('entry_index').order('member_index'),
+    ]).then(([{ data: mk, error: mkErr }, { data: parts, error: partsErr }]) => {
+      if (mkErr) showFlash(`❌ ${mkErr.message}`)
+      else setEventMarks(mk ?? [])
+      if (partsErr) showFlash(`❌ ${partsErr.message}`)
+      else setEventParticipants(parts ?? [])
+    })
   }, [selectedEvent?.id])
 
   useEffect(() => {
     if (!selectedEvent) { setDraft({}); return }
     const d: Record<number, Record<number, string>> = {}
-    schools.forEach(s => {
-      if (!s.slot_number) return
-      d[s.slot_number] = {}
-      for (let e = 1; e <= (selectedEvent.max_entries ?? 1); e++) {
-        const row = eventMarks.find((m: any) => m.slot_number === s.slot_number && m.entry_index === e)
-        d[s.slot_number][e] = row ? String(row.total) : ''
+    // Only build draft rows for slots that have registered participants
+    const registeredSlots = [...new Set(eventParticipants.map((p: any) => p.slot_number))]
+    registeredSlots.forEach(slot => {
+      const maxE = Math.max(...eventParticipants.filter((p: any) => p.slot_number === slot).map((p: any) => p.entry_index ?? 1), 1)
+      d[slot] = {}
+      for (let e = 1; e <= maxE; e++) {
+        const row = eventMarks.find((m: any) => m.slot_number === slot && m.entry_index === e)
+        d[slot][e] = row ? String(row.total) : ''
       }
     })
     setDraft(d)
-  }, [selectedEvent, eventMarks, schools])
+  }, [selectedEvent, eventMarks, eventParticipants])
 
   async function handleSave() {
     if (!selectedEvent) return
@@ -195,9 +203,6 @@ export default function AdminManualMarksPage() {
   if (loading) return <PageSpinner />
 
   const filteredEvents = events.filter(e => e.category_id === selectedCat)
-  const maxEntries = selectedEvent?.max_entries ?? 1
-  const hasMultiEntry = maxEntries > 1
-
   const hasMarks = selectedEvent ? marksIndex.has(selectedEvent.id) : false
   const result = selectedEvent ? results[selectedEvent.id] : null
   const isPublished = result?.published ?? false
@@ -264,7 +269,7 @@ export default function AdminManualMarksPage() {
             <div>
               <h3 className="font-semibold text-gray-800">{selectedEvent.name}</h3>
               <p className="text-xs text-gray-400 mt-0.5">
-                Enter total score per slot{hasMultiEntry ? ' and entry' : ''}. Leave blank to skip.
+                Only registered participants are shown. Enter total score per entry. Leave blank to skip.
               </p>
             </div>
 
@@ -297,44 +302,49 @@ export default function AdminManualMarksPage() {
 
           {/* Scores table */}
           <div className="rounded-xl border border-gray-100 overflow-hidden">
+            {eventParticipants.length === 0 ? (
+              <div className="px-4 py-8 text-center text-gray-400 text-sm">No participants registered for this event yet.</div>
+            ) : (
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="text-left px-4 py-2.5 font-semibold text-gray-600 w-16">Slot</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-gray-600">Participant</th>
                   <th className="text-left px-4 py-2.5 font-semibold text-gray-600">School</th>
-                  {hasMultiEntry
-                    ? Array.from({ length: maxEntries }, (_, i) => (
-                        <th key={i} className="text-left px-4 py-2.5 font-semibold text-gray-600">Entry {i + 1} Score</th>
-                      ))
-                    : <th className="text-left px-4 py-2.5 font-semibold text-gray-600">Score</th>
-                  }
+                  <th className="text-left px-4 py-2.5 font-semibold text-gray-600">Score</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {schools.filter(s => s.slot_number).map(s => (
-                  <tr key={s.slot_number} className="hover:bg-gray-50">
-                    <td className="px-4 py-2.5 font-mono text-xs text-gray-500">{s.slot_number}</td>
-                    <td className="px-4 py-2.5 text-gray-800">{s.school_name}</td>
-                    {Array.from({ length: maxEntries }, (_, i) => {
-                      const entry = i + 1
-                      return (
-                        <td key={entry} className="px-4 py-2.5">
+                {Object.entries(draft).sort(([a], [b]) => Number(a) - Number(b)).map(([slotStr, entries]) => {
+                  const slot = Number(slotStr)
+                  const school = schools.find(s => s.slot_number === slot)
+                  return Object.entries(entries).sort(([a], [b]) => Number(a) - Number(b)).map(([entryStr, score]) => {
+                    const entry = Number(entryStr)
+                    const partMembers = eventParticipants.filter((p: any) => p.slot_number === slot && (p.entry_index ?? 1) === entry)
+                    const participantName = partMembers.map((p: any) => p.participant_name).filter(Boolean).join(', ') || '—'
+                    return (
+                      <tr key={`${slot}_${entry}`} className="hover:bg-gray-50">
+                        <td className="px-4 py-2.5 font-mono text-xs text-gray-500">{slot}{Object.keys(entries).length > 1 ? ` E${entry}` : ''}</td>
+                        <td className="px-4 py-2.5 text-gray-800 font-medium">{participantName}</td>
+                        <td className="px-4 py-2.5 text-gray-600">{school?.school_name ?? `Slot ${slot}`}</td>
+                        <td className="px-4 py-2.5">
                           <input
                             type="number" min={0} step={0.01} placeholder="—"
-                            value={draft[s.slot_number]?.[entry] ?? ''}
+                            value={score}
                             onChange={e => setDraft(d => ({
                               ...d,
-                              [s.slot_number]: { ...(d[s.slot_number] ?? {}), [entry]: e.target.value }
+                              [slot]: { ...(d[slot] ?? {}), [entry]: e.target.value }
                             }))}
                             className="input w-28 py-1 text-sm"
                           />
                         </td>
-                      )
-                    })}
-                  </tr>
-                ))}
+                      </tr>
+                    )
+                  })
+                })}
               </tbody>
             </table>
+            )}
           </div>
 
           {/* Winners summary (shown when computed) */}
