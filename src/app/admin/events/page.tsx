@@ -133,13 +133,12 @@ export default function AdminEventsPage() {
       rules: form.rules || null,
     }
 
-    if (editId) {
-      const { error } = await supabase.from('events').update(payload).eq('id', editId)
-      if (error) { setMessage(`❌ ${error.message}`); setSaving(false); return }
-    } else {
-      const { error } = await supabase.from('events').insert(payload)
-      if (error) { setMessage(`❌ ${error.message}`); setSaving(false); return }
-    }
+    const res = await fetch('/api/admin/delete-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId: editId || null, payload }),
+    })
+    if (!res.ok) { const j = await res.json(); setMessage(`❌ ${j.error ?? 'Save failed'}`); setSaving(false); return }
 
     const successMsg = editId ? 'Event updated!' : 'Event created!'
     await load()
