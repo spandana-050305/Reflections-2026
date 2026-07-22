@@ -83,12 +83,33 @@ export default function AdminResultsPage() {
     const eventMarks = manualMarks.filter(m => m.event_id === eventId)
     if (eventMarks.length === 0) { showMessage('❌ No marks found for this event.'); setComputing(null); return }
 
+    // Fetch participant names for this event
+    const { data: participants } = await supabase
+      .from('participants')
+      .select('slot_number, entry_index, participant_name, member_index')
+      .eq('event_id', eventId)
+      .order('member_index')
+
+    function getNamesForEntry(slot: number, entry: number): string {
+      const members = (participants ?? []).filter(p => p.slot_number === slot && (p.entry_index ?? 1) === entry)
+      if (members.length === 0) return ''
+      return members.map((p: any) => p.participant_name).filter(Boolean).join(', ')
+    }
+
     const sorted = [...eventMarks].sort((a, b) => Number(b.total) - Number(a.total))
     const groups: { rank: number; total: number; entries: { slot: number; entry: number; names: string }[] }[] = []
     let rank = 1, i = 0
     while (i < sorted.length && groups.length < 3) {
       const tied = sorted.filter(x => x.total === sorted[i].total)
-      groups.push({ rank, total: Number(sorted[i].total), entries: tied.map(x => ({ slot: x.slot_number, entry: x.entry_index ?? 1, names: '' })) })
+      groups.push({
+        rank,
+        total: Number(sorted[i].total),
+        entries: tied.map(x => ({
+          slot: x.slot_number,
+          entry: x.entry_index ?? 1,
+          names: getNamesForEntry(x.slot_number, x.entry_index ?? 1),
+        })),
+      })
       rank += 1; i += tied.length
     }
 
@@ -258,16 +279,14 @@ export default function AdminResultsPage() {
                           <div className="space-y-1">
                             {group.entries.map((entry, i) => {
                               const hasMultiEntry = group.entries.some(e => e.slot === entry.slot && e.entry !== entry.entry)
-                              const label = hasMultiEntry
-                                ? `Slot ${entry.slot} Entry ${entry.entry}`
-                                : `Slot ${entry.slot}`
                               return (
-                                <div key={i} className="flex items-baseline gap-2">
-                                  <span className="font-medium text-gray-800 text-sm">{label}</span>
-                                  <span className="text-xs text-gray-500">({getSchoolName(entry.slot)})</span>
-                                  {entry.names && (
-                                    <span className="text-xs text-brand-700 font-medium">· {entry.names}</span>
-                                  )}
+                                <div key={i} className="flex items-baseline gap-2 flex-wrap">
+                                  <span className="text-xs text-gray-400 font-mono">Slot {entry.slot}{hasMultiEntry ? ` E${entry.entry}` : ''}</span>
+                                  {entry.names
+                                    ? <span className="font-medium text-gray-800 text-sm">{entry.names}</span>
+                                    : <span className="font-medium text-gray-800 text-sm">{getSchoolName(entry.slot)}</span>
+                                  }
+                                  {entry.names && <span className="text-xs text-gray-400">· {getSchoolName(entry.slot)}</span>}
                                 </div>
                               )
                             })}

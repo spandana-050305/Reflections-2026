@@ -187,8 +187,11 @@ export default function PublicResultsPage() {
                                         )}
                                       </td>
                                     )}
-                                    <td className="px-4 py-3.5 font-medium text-brand-900">
-                                      {e.names || '—'}
+                                    <td className="px-4 py-3.5">
+                                      {e.names
+                                        ? <span className="font-medium text-brand-900">{e.names}</span>
+                                        : <span className="text-brand-800/40 text-xs italic">—</span>
+                                      }
                                     </td>
                                     <td className="px-4 py-3.5 text-brand-800/70">
                                       {getSchoolName(e.slot)}
