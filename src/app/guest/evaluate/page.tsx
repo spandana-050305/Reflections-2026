@@ -82,7 +82,6 @@ export default function GuestEvaluatePage() {
   }
 
   async function loadParticipantsForEvent(ev: Event) {
-    // Fetch only slot/entry — no names or school data reaches the judge UI
     const { data: participantData, error: partErr } = await supabase
       .from('participants')
       .select('slot_number, entry_index')
@@ -98,10 +97,10 @@ export default function GuestEvaluatePage() {
     const seen = new Set<string>()
     const flat: EntryRow[] = []
     ;(participantData ?? []).forEach((p: any) => {
-      const k = `${p.slot_number}_${p.entry_index}`
+      const k = `${p.slot_number}_${p.entry_index ?? 1}`
       if (!seen.has(k)) {
         seen.add(k)
-        flat.push({ slot_number: p.slot_number, entry_index: p.entry_index })
+        flat.push({ slot_number: p.slot_number, entry_index: p.entry_index ?? 1 })
       }
     })
     setRows(flat)
