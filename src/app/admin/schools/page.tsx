@@ -120,77 +120,12 @@ export default function AdminSchoolsPage() {
     setShowShuffleWarning(false)
     setShuffling(true)
 
-    const withSlots = schools.filter(s => s.slot_number != null)
-    if (withSlots.length < 2) {
-      showMsg('Need at least 2 schools with slot numbers to shuffle.', 'error')
+    const res = await fetch('/api/admin/shuffle-slots', { method: 'POST' })
+    const json = await res.json()
+    if (!res.ok) {
+      showMsg(`❌ ${json.error ?? 'Shuffle failed'}`, 'error')
       setShuffling(false)
       return
-    }
-
-    // Clear computed results first — slot numbers in results would point to wrong schools after shuffle
-    await supabase.from('results').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-
-    const oldSlots = withSlots.map(s => s.slot_number)
-    const newSlots = [...oldSlots]
-    for (let i = newSlots.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1))
-      ;[newSlots[i], newSlots[j]] = [newSlots[j], newSlots[i]]
-    }
-
-    for (let i = 0; i < withSlots.length; i++) {
-      const school = withSlots[i]
-      const tempSlot = oldSlots[i] + 10000
-      const results = await Promise.all([
-        supabase.from('schools').update({ slot_number: tempSlot }).eq('id', school.id),
-        supabase.from('participants').update({ slot_number: tempSlot }).eq('slot_number', oldSlots[i]),
-        supabase.from('marks').update({ slot_number: tempSlot }).eq('slot_number', oldSlots[i]),
-        supabase.from('guest_marks').update({ slot_number: tempSlot }).eq('slot_number', oldSlots[i]),
-        supabase.from('onspot_registrations').update({ slot_number: tempSlot }).eq('slot_number', oldSlots[i]),
-      ])
-      const firstErr = results.find(r => r.error)?.error
-      if (firstErr) {
-        showMsg(`❌ Shuffle failed: ${firstErr.message}. Check your data — slots may be partially updated.`, 'error')
-        setShuffling(false)
-        await load()
-        return
-      }
-    }
-
-    for (let i = 0; i < withSlots.length; i++) {
-      const school = withSlots[i]
-      const tempSlot = oldSlots[i] + 10000
-      const results = await Promise.all([
-        supabase.from('schools').update({ slot_number: newSlots[i] }).eq('id', school.id),
-        supabase.from('participants').update({ slot_number: newSlots[i] }).eq('slot_number', tempSlot),
-        supabase.from('marks').update({ slot_number: newSlots[i] }).eq('slot_number', tempSlot),
-        supabase.from('guest_marks').update({ slot_number: newSlots[i] }).eq('slot_number', tempSlot),
-        supabase.from('onspot_registrations').update({ slot_number: newSlots[i] }).eq('slot_number', tempSlot),
-      ])
-      const firstErr = results.find(r => r.error)?.error
-      if (firstErr) {
-        showMsg(`❌ Shuffle failed mid-way: ${firstErr.message}. Check your data — slots may be partially updated.`, 'error')
-        setShuffling(false)
-        await load()
-        return
-      }
-    }
-
-    // Update slot_number in each school's Auth user metadata so their portal reflects the new slot immediately
-    const metaUpdates = withSlots
-      .map((school, i) => school.user_id ? { userId: school.user_id, slotNumber: newSlots[i] } : null)
-      .filter((x): x is { userId: string; slotNumber: number } => x !== null)
-    if (metaUpdates.length > 0) {
-      const metaRes = await fetch('/api/admin/update-slot-metadata', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updates: metaUpdates }),
-      })
-      if (!metaRes.ok) {
-        showMsg('⚠️ Slots shuffled but metadata update failed — schools may need to re-login to see new slots.', 'error')
-        setShuffling(false)
-        await load()
-        return
-      }
     }
 
     await load()
