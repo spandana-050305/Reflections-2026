@@ -36,10 +36,10 @@ export default function EventDetailPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.user) { router.push('/login'); return }
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
 
-      const slot = session.user.user_metadata?.slot_number as number
+      const slot = user.user_metadata?.slot_number as number
       if (!slot) { router.push('/login'); return }   // guard: no slot assigned yet
       setSlotNumber(slot)
 

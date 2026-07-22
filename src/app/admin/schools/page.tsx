@@ -177,8 +177,8 @@ export default function AdminSchoolsPage() {
 
     // Update slot_number in each school's Auth user metadata so their portal reflects the new slot immediately
     const metaUpdates = withSlots
-      .filter(s => s.user_id)
-      .map((school, i) => ({ userId: school.user_id, slotNumber: newSlots[i] }))
+      .map((school, i) => school.user_id ? { userId: school.user_id, slotNumber: newSlots[i] } : null)
+      .filter((x): x is { userId: string; slotNumber: number } => x !== null)
     if (metaUpdates.length > 0) {
       const metaRes = await fetch('/api/admin/update-slot-metadata', {
         method: 'POST',
