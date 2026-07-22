@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
-import { LayoutDashboard, ListChecks, Trophy } from 'lucide-react'
+import { LayoutDashboard, ListChecks, Trophy, Calendar } from 'lucide-react'
 import NavBar from '@/components/layout/NavBar'
 import NavLink from '@/components/layout/NavLink'
 
@@ -15,6 +15,7 @@ export default async function SchoolLayout({ children }: { children: React.React
   const navLinks = [
     { href: '/school/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/school/events', label: 'Events', icon: ListChecks },
+    { href: '/school/schedule', label: 'Schedule', icon: Calendar },
     { href: '/school/results', label: 'Results', icon: Trophy },
   ]
 
