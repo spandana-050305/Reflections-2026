@@ -143,14 +143,15 @@ export default function GuestEvaluatePage() {
     }
 
     // Look for marks this judge has already submitted for this event.
-    const { data: existing, error: fetchErr } = await supabase
-      .from('guest_marks')
-      .select('*')
-      .eq('event_id', event.id)
-      .eq('judge_number', judgeNumber)
-    if (fetchErr) { setSubmitError(`Failed to check existing marks: ${fetchErr.message}`); return }
+    const existingRes = await fetch(`/api/guest/existing-marks?eventId=${event.id}&judgeNumber=${judgeNumber}`)
+    const existingJson = await existingRes.json().catch(() => ({ marks: [] }))
+    const existing = existingJson.marks ?? []
+    if (!existingRes.ok && existingRes.status !== 200) {
+      setSubmitError(`Failed to check existing marks: ${existingJson.error ?? 'Unknown'}`)
+      return
+    }
 
-    const existingMarks = existing ?? []
+    const existingMarks = existing
 
     // Resume: load whatever was previously submitted so the judge can
     // continue where they left off (or see it's already finished).
