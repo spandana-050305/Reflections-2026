@@ -102,32 +102,21 @@ export default function AdminGuestMarksPage() {
       setGuestMarks([]); setManualMarks([]); setParticipants([])
       return
     }
-    const [
-      { data: gm,   error: gmErr   },
-      { data: mm,   error: mmErr   },
-      { data: parts,error: partsErr},
-    ] = await Promise.all([
-      supabase.from('guest_marks').select('*').in('event_id', catEventIds),
-      supabase.from('marks').select('*').in('event_id', catEventIds),
-      supabase.from('participants')
-        .select('slot_number, event_id, entry_index, member_index, participant_name')
-        .in('event_id', catEventIds)
-        .order('entry_index').order('member_index'),
-    ])
-    const firstErr = gmErr ?? mmErr ?? partsErr
-    if (firstErr) { flash(`❌ Failed to load marks: ${firstErr.message}`); return }
-    setGuestMarks(gm ?? [])
+    const res = await fetch('/api/admin/load-guest-marks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventIds: catEventIds }),
+    })
+    if (!res.ok) { flash('❌ Failed to load marks'); return }
+    const { marks, manualMarks: mm, participants: parts } = await res.json()
+    setGuestMarks(marks ?? [])
     setManualMarks(mm ?? [])
     setParticipants(parts ?? [])
   }
 
   // After mutations: reload results + current category marks (no need to re-fetch cats/events)
   async function reload() {
-    const { data: resultData } = await supabase.from('results').select('*')
-    const res: Record<string, any> = {}
-    ;(resultData ?? []).forEach((r: any) => { res[r.event_id] = r })
-    setResults(res)
-    await loadCategory(selectedCatRef.current)
+    await Promise.all([loadBase(), loadCategory(selectedCatRef.current)])
     setLastRefreshed(new Date())
   }
 
