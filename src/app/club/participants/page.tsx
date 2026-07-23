@@ -229,24 +229,21 @@ export default function ClubParticipantsPage() {
 
     const nextEntry = distinctEntries + 1
     setOnspotSaving(true)
-    const { data: insertedOnspot, error: onspotErr } = await supabase.from('onspot_registrations').insert({
-      slot_number: slotNum, event_id: evId,
-      participant_name: onspotForm.participant_name.trim(),
-      amount_paid: onspotForm.amount_paid,
-      created_at: new Date().toISOString(),
-    }).select('id').single()
-    if (onspotErr) { flash(`❌ ${onspotErr.message}`); setOnspotSaving(false); return }
-
-    const { error: partErr } = await supabase.from('participants').insert({
-      slot_number: slotNum, event_id: evId,
-      participant_name: onspotForm.participant_name.trim(),
-      entry_index: nextEntry, member_index: 1,
-      created_at: new Date().toISOString(),
+    // Route through service role API (anon client is blocked by RLS for writes)
+    // entry_index is stored in onspot_registrations so deleteOnspot can match precisely
+    const onspotRes = await fetch('/api/admin/onspot-registration', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        slotNumber: slotNum, eventId: evId,
+        participantName: onspotForm.participant_name.trim(),
+        amountPaid: onspotForm.amount_paid,
+        entryIndex: nextEntry,
+      }),
     })
-    if (partErr) {
-      // Roll back by ID — safe even if another record shares the same name/slot/event
-      await supabase.from('onspot_registrations').delete().eq('id', insertedOnspot.id)
-      flash(`❌ ${partErr.message}`)
+    if (!onspotRes.ok) {
+      const j = await onspotRes.json().catch(() => ({}))
+      flash(`❌ ${j.error ?? 'Registration failed'}`)
       setOnspotSaving(false)
       return
     }
@@ -260,22 +257,28 @@ export default function ClubParticipantsPage() {
   }
 
   async function toggleAmountPaid(id: string, current: boolean) {
-    const { error } = await supabase.from('onspot_registrations').update({ amount_paid: !current }).eq('id', id)
-    if (error) { flash(`❌ ${error.message}`); return }
+    const res = await fetch('/api/admin/onspot-registration', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ onspotId: id, amountPaid: !current }),
+    })
+    if (!res.ok) { const j = await res.json().catch(() => ({})); flash(`❌ ${j.error ?? 'Update failed'}`); return }
     loadOnspots()
   }
 
-  async function deleteOnspot(o: { id: string; slot_number: number; event_id: string; participant_name: string }) {
-    const { error: delOnspotErr } = await supabase.from('onspot_registrations').delete().eq('id', o.id)
-    if (delOnspotErr) { flash(`❌ ${delOnspotErr.message}`); return }
-    // Also remove the participant row that was created alongside this on-spot registration
-    const { error: delPartErr } = await supabase.from('participants')
-      .delete()
-      .eq('slot_number', o.slot_number)
-      .eq('event_id', o.event_id)
-      .eq('participant_name', o.participant_name)
-      .eq('member_index', 1)
-    if (delPartErr) { flash(`❌ ${delPartErr.message}`); return }
+  async function deleteOnspot(o: { id: string; slot_number: number; event_id: string; participant_name: string; entry_index?: number }) {
+    const res = await fetch('/api/admin/onspot-registration', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        onspotId: o.id,
+        slotNumber: o.slot_number,
+        eventId: o.event_id,
+        participantName: o.participant_name,
+        entryIndex: o.entry_index ?? 1,
+      }),
+    })
+    if (!res.ok) { const j = await res.json().catch(() => ({})); flash(`❌ ${j.error ?? 'Delete failed'}`); return }
     loadOnspots()
     if (selectedEvent === o.event_id) loadParticipants(selectedEvent)
   }
@@ -368,7 +371,7 @@ export default function ClubParticipantsPage() {
                           {editingId === p.id ? (
                             <div className="flex items-center gap-2 flex-1">
                               <input value={editName} onChange={e => setEditName(e.target.value)} className="input flex-1" autoFocus />
-                              <button onClick={async () => { const trimmed = editName.trim(); if (!trimmed) { flash('❌ Name cannot be empty.'); return } const { error } = await supabase.from('participants').update({ participant_name: trimmed }).eq('id', p.id); if (error) { flash(`❌ ${error.message}`); return } setEditingId(null); loadParticipants(selectedEvent) }} className="btn-primary px-2 py-1"><Check size={14} /></button>
+                              <button onClick={async () => { const trimmed = editName.trim(); if (!trimmed) { flash('❌ Name cannot be empty.'); return } const res = await fetch('/api/admin/manage-participant', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, participant_name: trimmed }) }); if (!res.ok) { const j = await res.json().catch(() => ({})); flash(`❌ ${j.error ?? 'Update failed'}`); return } setEditingId(null); loadParticipants(selectedEvent) }} className="btn-primary px-2 py-1"><Check size={14} /></button>
                               <button onClick={() => setEditingId(null)} className="btn-secondary px-2 py-1"><X size={14} /></button>
                             </div>
                           ) : (
@@ -376,7 +379,7 @@ export default function ClubParticipantsPage() {
                               <span className="text-sm text-gray-800">{ev?.is_team_event ? `Member ${p.member_index}: ` : ''}{p.participant_name}</span>
                               <div className="flex gap-2">
                                 <button onClick={() => { setEditingId(p.id); setEditName(p.participant_name) }} className="text-gray-400 hover:text-brand-600"><Pencil size={14} /></button>
-                                <button onClick={async () => { const { error } = await supabase.from('participants').delete().eq('id', p.id); if (error) { flash(`❌ ${error.message}`); return } loadParticipants(selectedEvent) }} className="text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
+                                <button onClick={async () => { const res = await fetch('/api/admin/manage-participant', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id }) }); if (!res.ok) { const j = await res.json().catch(() => ({})); flash(`❌ ${j.error ?? 'Delete failed'}`); return } loadParticipants(selectedEvent) }} className="text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
                               </div>
                             </>
                           )}

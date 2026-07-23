@@ -118,21 +118,15 @@ export default function EventDetailPage() {
       return
     }
 
-    // Delete existing, then insert fresh
-    const { error: deleteError } = await supabase.from('participants')
-      .delete()
-      .eq('event_id', eventId)
-      .eq('slot_number', slotNumber)
-
-    if (deleteError) {
-      showMessage(`❌ Error clearing old entries: ${deleteError.message}`)
-      setSaving(false)
-      return
-    }
-
-    const { error } = await supabase.from('participants').insert(rows)
-    if (error) {
-      showMessage(`❌ Error saving participants: ${error.message}. Your previous entries may have been lost — please re-enter and save again.`)
+    // Route through service role API (anon client is blocked by RLS for writes)
+    const res = await fetch('/api/school/save-participants', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId, rows }),
+    })
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      showMessage(`❌ Error saving participants: ${j.error ?? 'Unknown error'}`)
       setSaving(false)
       return
     }

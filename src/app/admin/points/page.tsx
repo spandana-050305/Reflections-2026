@@ -1,13 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase'
 import { TableProperties } from 'lucide-react'
 import PageSpinner from '@/components/layout/PageSpinner'
 
 export default function AdminPointsPage() {
-  const supabase = createClient()
-
   const [results,    setResults]    = useState<any[]>([])
   const [schools,    setSchools]    = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
@@ -20,32 +17,30 @@ export default function AdminPointsPage() {
   const [loading, setLoading] = useState(true)
 
   async function load() {
-    const [
-      { data: res, error: resErr },
-      { data: sc,  error: scErr  },
-      { data: cats,error: catsErr},
-      { data: evs, error: evsErr },
-      { data: stg, error: stgErr },
-    ] = await Promise.all([
-      supabase.from('results').select('*'),
-      supabase.from('schools').select('slot_number, school_name').order('slot_number'),
-      supabase.from('categories').select('*').order('display_order'),
-      supabase.from('events').select('id, category_id, name'),
-      supabase.from('settings').select('*').maybeSingle(),
-    ])
-    const firstErr = resErr ?? scErr ?? catsErr ?? evsErr ?? stgErr
-    if (firstErr) { setLoadError(`❌ Failed to load: ${firstErr.message}`); setLoading(false); return }
-    setResults(res ?? [])
-    setSchools(sc ?? [])
-    setCategories(cats ?? [])
-    setEvents(evs ?? [])
+    // Use service role API so all results (including unpublished) are visible
+    const res = await fetch('/api/admin/load-admin-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tables: ['results', 'schools', 'categories', 'events', 'settings'] }),
+    })
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      setLoadError(`❌ Failed to load: ${j.error ?? 'Unknown error'}`)
+      setLoading(false)
+      return
+    }
+    const data = await res.json()
+    setResults(data.results ?? [])
+    setSchools(data.schools ?? [])
+    setCategories(data.categories ?? [])
+    setEvents(data.events ?? [])
+    const stg = data.settings?.[0]
     if (stg) {
-      const p = {
+      setPts({
         p1: stg.points_1st ?? 15,
         p2: stg.points_2nd ?? 10,
         p3: stg.points_3rd ?? 5,
-      }
-      setPts(p)
+      })
     }
     setLoading(false)
   }
@@ -89,11 +84,11 @@ export default function AdminPointsPage() {
     (a, b) => (b.school.slot_number ?? -Infinity) - (a.school.slot_number ?? -Infinity)
   )
 
-  // Podium: rank by total points (descending), ties share a rank.
+  // Podium: rank by total points (descending), ties share a rank (dense ranking).
   const ranked = [...schoolRows].filter(r => r.rowTotal > 0).sort((a, b) => b.rowTotal - a.rowTotal)
   let curRank = 0, prevTotal: number | null = null
-  const standings = ranked.map((r, i) => {
-    if (prevTotal === null || r.rowTotal < prevTotal) { curRank = i + 1; prevTotal = r.rowTotal }
+  const standings = ranked.map((r) => {
+    if (prevTotal === null || r.rowTotal < prevTotal) { curRank += 1; prevTotal = r.rowTotal }
     return { ...r, rank: curRank }
   })
   const podium = [1, 2, 3].map(rank => ({ rank, rows: standings.filter(s => s.rank === rank) }))
