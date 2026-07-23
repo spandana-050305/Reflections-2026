@@ -42,7 +42,7 @@ export async function middleware(request: NextRequest) {
     if (role === 'club_member')  return NextResponse.redirect(new URL('/club/dashboard', request.url))
     if (role === 'final_year')   return NextResponse.redirect(new URL('/admin/dashboard', request.url))
     if (role === 'guest')        return NextResponse.redirect(new URL('/guest/evaluate', request.url))
-    if (role === 'super_admin')  return NextResponse.redirect(new URL('/admin/dashboard', request.url))
+    if (role === 'super_admin')  return NextResponse.redirect(new URL('/superadmin/dashboard', request.url))
   }
 
   // Portal protection — wrong role gets kicked back to login

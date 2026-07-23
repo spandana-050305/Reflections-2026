@@ -114,9 +114,10 @@ export default function AdminGuestMarksPage() {
     setParticipants(parts ?? [])
   }
 
-  // After mutations: reload results + current category marks (no need to re-fetch cats/events)
+  // After mutations: reload base first (to get fresh events), then marks
   async function reload() {
-    await Promise.all([loadBase(), loadCategory(selectedCatRef.current)])
+    const base = await loadBase()
+    if (base) await loadCategory(selectedCatRef.current, base.evs)
     setLastRefreshed(new Date())
   }
 
@@ -222,14 +223,12 @@ export default function AdminGuestMarksPage() {
 
   async function setEntryLock(eventId: string, slot: number, entry: number, locked: boolean): Promise<string | null> {
     const rows = rowsFor(eventId, slot, entry)
-    for (const r of rows) {
-      const { error } = await supabase.from('guest_marks').upsert({
-        event_id: eventId, judge_number: r.judge_number, judge_name: r.judge_name,
-        slot_number: slot, entry_index: entry,
-        criteria_scores: r.criteria_scores, judge_total: r.judge_total, locked,
-      }, { onConflict: 'event_id,judge_number,slot_number,entry_index' })
-      if (error) return error.message
-    }
+    const res = await fetch('/api/admin/set-entry-lock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId, slot, entry, locked, rows }),
+    })
+    if (!res.ok) { const j = await res.json(); return j.error ?? 'Failed to set lock' }
     return null
   }
 
@@ -265,12 +264,13 @@ export default function AdminGuestMarksPage() {
 
   async function fullUnlock(eventId: string) {
     setSaving(true)
-    for (const { slot, entry } of entriesForEvent(eventId)) {
-      const err = await setEntryLock(eventId, slot, entry, false)
-      if (err) { flash(`❌ ${err}`); setSaving(false); return }
-    }
-    const { error: delErr } = await supabase.from('results').delete().eq('event_id', eventId)
-    if (delErr) { flash(`❌ ${delErr.message}`); setSaving(false); return }
+    const allRows = guestMarks.filter(m => m.event_id === eventId)
+    const res = await fetch('/api/admin/set-entry-lock', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId, allRows }),
+    })
+    if (!res.ok) { const j = await res.json(); flash(`❌ ${j.error ?? 'Failed to unlock'}`); setSaving(false); return }
     await reload()
     flash('Fully unlocked ✓')
     setSaving(false)
@@ -302,18 +302,14 @@ export default function AdminGuestMarksPage() {
     setEditSaving(true)
     const { eventId, judgeNumber, judgeName: jName, slot, entry, scores } = editModal
     const judgeTotal = scores.reduce((a, b) => a + (Number(b) || 0), 0)
-    const { error } = await supabase.from('guest_marks').upsert({
-      event_id: eventId,
-      judge_number: judgeNumber,
-      judge_name: jName,
-      slot_number: slot,
-      entry_index: entry,
-      criteria_scores: scores,
-      judge_total: judgeTotal,
-      locked: false,
-    }, { onConflict: 'event_id,judge_number,slot_number,entry_index' })
+    const row = { judge_number: judgeNumber, judge_name: jName, criteria_scores: scores, judge_total: judgeTotal }
+    const res = await fetch('/api/admin/set-entry-lock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId, slot, entry, locked: false, rows: [row] }),
+    })
     setEditSaving(false)
-    if (error) { flash(`❌ ${error.message}`); return }
+    if (!res.ok) { const j = await res.json(); flash(`❌ ${j.error ?? 'Failed to save'}`); return }
     await reload()
     flash('Marks updated ✓')
     setEditModal(null)
@@ -356,16 +352,13 @@ export default function AdminGuestMarksPage() {
       groups.push({ rank, total: seList[i].total, entries: tied.map(x => ({ slot: x.slot, entry: x.entry, names: x.names })) })
       rank += 1; i += tied.length
     }
-    const { error: upsertErr } = await supabase.from('results').upsert({
-      event_id: eventId,
-      first_slot: groups[0]?.entries[0]?.slot ?? null,
-      second_slot: groups[1]?.entries[0]?.slot ?? null,
-      third_slot: groups[2]?.entries[0]?.slot ?? null,
-      winners_json: JSON.stringify(groups),
-      published: false,
-    }, { onConflict: 'event_id' })
+    const res = await fetch('/api/admin/compute-result', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId, winnersJson: JSON.stringify(groups) }),
+    })
     setSaving(false)
-    if (upsertErr) { flash(`❌ ${upsertErr.message}`); return }
+    if (!res.ok) { const j = await res.json(); flash(`❌ ${j.error ?? 'Failed to compute'}`); return }
     await reload()
     flash('Winners computed from guest marks ✓')
     setComputeTarget(null)

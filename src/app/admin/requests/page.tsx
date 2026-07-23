@@ -61,10 +61,13 @@ export default function AdminRequestsPage() {
       const json = await res.json()
       if (!res.ok) { flash(`❌ ${json.error ?? 'Approval failed'}`); setBusy(null); return }
     } else {
-      const { error } = await supabase.from('club_accounts')
-        .update({ status, reviewed_at: new Date().toISOString() })
-        .eq('id', acct.id)
-      if (error) { flash(`❌ ${error.message}`); setBusy(null); return }
+      const res = await fetch('/api/admin/approve-club-account', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId: acct.id, status, email: acct.email }),
+      })
+      const json = await res.json()
+      if (!res.ok) { flash(`❌ ${json.error ?? 'Update failed'}`); setBusy(null); return }
     }
 
     setAccounts(prev => prev.map(a => a.id === acct.id ? { ...a, status, reviewed_at: new Date().toISOString() } : a))

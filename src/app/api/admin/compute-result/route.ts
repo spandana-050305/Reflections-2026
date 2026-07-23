@@ -22,45 +22,44 @@ async function getCallerRole(): Promise<string | null> {
   return user?.user_metadata?.role ?? null
 }
 
-// GET: return distinct (event_id, judge_number, judge_name) for all events (used by judge tracker)
-export async function GET() {
-  const role = await getCallerRole()
-  if (!role || !['final_year', 'super_admin', 'club_member'].includes(role)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-  }
-
-  const admin = adminClient()
-  const { data, error } = await admin
-    .from('guest_marks')
-    .select('event_id, judge_number, judge_name')
-    .order('judge_number')
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ submissions: data ?? [] })
-}
-
+// Upsert a result row for an event
 export async function POST(request: Request) {
   const role = await getCallerRole()
   if (!role || !['final_year', 'super_admin', 'club_member'].includes(role)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
 
-  const { eventIds } = await request.json()
-  if (!eventIds?.length) return NextResponse.json({ marks: [], manualMarks: [], participants: [] })
+  const { eventId, winnersJson } = await request.json()
+  if (!eventId || !winnersJson) {
+    return NextResponse.json({ error: 'Missing eventId or winnersJson' }, { status: 400 })
+  }
 
   const admin = adminClient()
-  const [
-    { data: gm },
-    { data: mm },
-    { data: parts },
-  ] = await Promise.all([
-    admin.from('guest_marks').select('*').in('event_id', eventIds),
-    admin.from('marks').select('*').in('event_id', eventIds),
-    admin.from('participants')
-      .select('slot_number, event_id, entry_index, member_index, participant_name')
-      .in('event_id', eventIds)
-      .order('entry_index').order('member_index'),
-  ])
+  const { error } = await admin.from('results').upsert(
+    { event_id: eventId, winners_json: winnersJson, published: false },
+    { onConflict: 'event_id' }
+  )
 
-  return NextResponse.json({ marks: gm ?? [], manualMarks: mm ?? [], participants: parts ?? [] })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
+
+// Fetch results for given event IDs
+export async function PUT(request: Request) {
+  const role = await getCallerRole()
+  if (!role || !['final_year', 'super_admin', 'club_member'].includes(role)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  }
+
+  const { eventIds } = await request.json()
+  if (!eventIds?.length) return NextResponse.json({ results: [] })
+
+  const admin = adminClient()
+  const { data, error } = await admin
+    .from('results')
+    .select('*')
+    .in('event_id', eventIds)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ results: data ?? [] })
 }

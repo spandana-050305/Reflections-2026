@@ -393,9 +393,9 @@ export default function AdminParticipantsPage() {
                           {editingId === p.id ? (
                             <div className="flex items-center gap-2 flex-1">
                               <input value={editName} onChange={e => setEditName(e.target.value)} className="input flex-1" autoFocus
-                                onKeyDown={async e => { if (e.key === 'Enter') { const trimmed = editName.trim(); if (!trimmed) { flash('❌ Name cannot be empty.'); return } const { error } = await supabase.from('participants').update({ participant_name: trimmed }).eq('id', p.id); if (error) { flash(`❌ ${error.message}`); return } setEditingId(null); loadParticipants(selectedEvent) } }}
+                                onKeyDown={async e => { if (e.key === 'Enter') { const trimmed = editName.trim(); if (!trimmed) { flash('❌ Name cannot be empty.'); return }; const r = await fetch('/api/admin/manage-participant', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ participantId: p.id, participantName: trimmed }) }); if (!r.ok) { const j = await r.json(); flash(`❌ ${j.error ?? 'Failed'}`); return } setEditingId(null); loadParticipants(selectedEvent) } }}
                               />
-                              <button onClick={async () => { const trimmed = editName.trim(); if (!trimmed) { flash('❌ Name cannot be empty.'); return } const { error } = await supabase.from('participants').update({ participant_name: trimmed }).eq('id', p.id); if (error) { flash(`❌ ${error.message}`); return } setEditingId(null); loadParticipants(selectedEvent) }} className="btn-primary px-2 py-1"><Check size={14} /></button>
+                              <button onClick={async () => { const trimmed = editName.trim(); if (!trimmed) { flash('❌ Name cannot be empty.'); return }; const r = await fetch('/api/admin/manage-participant', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ participantId: p.id, participantName: trimmed }) }); if (!r.ok) { const j = await r.json(); flash(`❌ ${j.error ?? 'Failed'}`); return } setEditingId(null); loadParticipants(selectedEvent) }} className="btn-primary px-2 py-1"><Check size={14} /></button>
                               <button onClick={() => setEditingId(null)} className="btn-secondary px-2 py-1"><X size={14} /></button>
                             </div>
                           ) : (
@@ -403,7 +403,7 @@ export default function AdminParticipantsPage() {
                               <span className="text-sm text-gray-800">{selectedEventObj?.is_team_event ? `Member ${p.member_index}: ` : ''}{p.participant_name}</span>
                               <div className="flex gap-2">
                                 <button onClick={() => { setEditingId(p.id); setEditName(p.participant_name) }} className="text-gray-400 hover:text-brand-600"><Pencil size={14} /></button>
-                                <button onClick={async () => { const { error } = await supabase.from('participants').delete().eq('id', p.id); if (error) { flash(`❌ ${error.message}`); return } loadParticipants(selectedEvent) }} className="text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
+                                <button onClick={async () => { const r = await fetch('/api/admin/manage-participant', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ participantId: p.id }) }); if (!r.ok) { const j = await r.json(); flash(`❌ ${j.error ?? 'Delete failed'}`); return } loadParticipants(selectedEvent) }} className="text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
                               </div>
                             </>
                           )}

@@ -29,17 +29,18 @@ export default function JudgeTrackerPage() {
     const [
       { data: cats },
       { data: evs },
-      { data: subs },
+      subsResult,
     ] = await Promise.all([
       supabase.from('categories').select('*').order('display_order'),
       supabase.from('events').select('id, name, category_id').order('name'),
-      supabase.from('guest_marks').select('event_id, judge_number, judge_name').order('judge_number'),
+      fetch('/api/admin/load-guest-marks').then(r => r.json()),
     ])
     setCategories(cats ?? [])
     setEvents(evs ?? [])
     // Deduplicate: one row per (event_id, judge_number)
+    const subs = subsResult?.submissions ?? []
     const seen = new Set<string>()
-    const deduped = (subs ?? []).filter(s => {
+    const deduped = subs.filter((s: any) => {
       const key = `${s.event_id}_${s.judge_number}`
       if (seen.has(key)) return false
       seen.add(key)

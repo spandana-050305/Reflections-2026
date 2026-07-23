@@ -83,12 +83,14 @@ export default function AdminResultsPage() {
     const eventMarks = manualMarks.filter(m => m.event_id === eventId)
     if (eventMarks.length === 0) { showMessage('❌ No marks found for this event.'); setComputing(null); return }
 
-    // Fetch participant names for this event
-    const { data: participants } = await supabase
-      .from('participants')
-      .select('slot_number, entry_index, participant_name, member_index')
-      .eq('event_id', eventId)
-      .order('member_index')
+    // Fetch participant names for this event via service role
+    let participants: any[] = []
+    const partRes = await fetch('/api/admin/load-guest-marks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventIds: [eventId] }),
+    })
+    if (partRes.ok) { const { participants: pts } = await partRes.json(); participants = pts ?? [] }
 
     function getNamesForEntry(slot: number, entry: number): string {
       const members = (participants ?? []).filter(p => p.slot_number === slot && (p.entry_index ?? 1) === entry)
@@ -113,18 +115,13 @@ export default function AdminResultsPage() {
       rank += 1; i += tied.length
     }
 
-    const { error } = await supabase.from('results').upsert({
-      event_id: eventId,
-      first_slot: groups[0]?.entries[0]?.slot ?? null,
-      second_slot: groups[1]?.entries[0]?.slot ?? null,
-      third_slot: groups[2]?.entries[0]?.slot ?? null,
-      winners_json: JSON.stringify(groups),
-      published: false,
-      computed_by_email: currentUserEmail || null,
-      computed_at: new Date().toISOString(),
-    }, { onConflict: 'event_id' })
+    const res = await fetch('/api/admin/compute-result', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId, winnersJson: JSON.stringify(groups) }),
+    })
     setComputing(null)
-    if (error) { showMessage(`❌ ${error.message}`); return }
+    if (!res.ok) { const j = await res.json(); showMessage(`❌ ${j.error ?? 'Failed to compute'}`); return }
     showMessage('Winners computed ✓')
     await load()
   }
@@ -137,8 +134,12 @@ export default function AdminResultsPage() {
   }
 
   async function togglePublish(eventId: string, currentlyPublished: boolean) {
-    const { error } = await supabase.from('results').update({ published: !currentlyPublished }).eq('event_id', eventId)
-    if (error) { showMessage(`❌ ${error.message}`); return }
+    const res = await fetch('/api/admin/toggle-publish', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId, published: !currentlyPublished }),
+    })
+    if (!res.ok) { const j = await res.json(); showMessage(`❌ ${j.error ?? 'Failed to update'}`); return }
     showMessage(currentlyPublished ? 'Result unpublished.' : 'Result published to schools!')
     await load()
   }

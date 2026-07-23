@@ -22,27 +22,23 @@ async function getCallerRole(): Promise<string | null> {
   return user?.user_metadata?.role ?? null
 }
 
-export async function GET(request: Request) {
+export async function PATCH(request: Request) {
   const role = await getCallerRole()
-  if (!role) {
+  if (!role || !['final_year', 'super_admin', 'club_member'].includes(role)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
 
-  const { searchParams } = new URL(request.url)
-  const eventId = searchParams.get('eventId')
-  const judgeNumber = searchParams.get('judgeNumber')
-
-  if (!eventId || !judgeNumber) {
-    return NextResponse.json({ error: 'Missing eventId or judgeNumber' }, { status: 400 })
+  const { eventId, published } = await request.json()
+  if (!eventId || published == null) {
+    return NextResponse.json({ error: 'Missing eventId or published' }, { status: 400 })
   }
 
   const admin = adminClient()
-  const { data, error } = await admin
-    .from('guest_marks')
-    .select('*')
+  const { error } = await admin
+    .from('results')
+    .update({ published })
     .eq('event_id', eventId)
-    .eq('judge_number', Number(judgeNumber))
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ marks: data ?? [] })
+  return NextResponse.json({ ok: true })
 }

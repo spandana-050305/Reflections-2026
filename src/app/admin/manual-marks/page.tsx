@@ -70,16 +70,14 @@ export default function AdminManualMarksPage() {
 
   useEffect(() => {
     if (!selectedEvent) { setEventMarks([]); setEventParticipants([]); return }
-    Promise.all([
-      supabase.from('marks').select('*').eq('event_id', selectedEvent.id),
-      supabase.from('participants').select('slot_number, entry_index, participant_name, member_index')
-        .eq('event_id', selectedEvent.id).order('slot_number').order('entry_index').order('member_index'),
-    ]).then(([{ data: mk, error: mkErr }, { data: parts, error: partsErr }]) => {
-      if (mkErr) showFlash(`❌ ${mkErr.message}`)
-      else setEventMarks(mk ?? [])
-      if (partsErr) showFlash(`❌ ${partsErr.message}`)
-      else setEventParticipants(parts ?? [])
-    })
+    fetch('/api/admin/load-guest-marks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventIds: [selectedEvent.id] }),
+    }).then(r => r.json()).then(({ manualMarks: mk, participants: parts }) => {
+      setEventMarks(mk ?? [])
+      setEventParticipants(parts ?? [])
+    }).catch(() => showFlash('❌ Failed to load event data'))
   }, [selectedEvent?.id])
 
   useEffect(() => {
@@ -91,7 +89,7 @@ export default function AdminManualMarksPage() {
       const maxE = Math.max(...eventParticipants.filter((p: any) => p.slot_number === slot).map((p: any) => p.entry_index ?? 1), 1)
       d[slot] = {}
       for (let e = 1; e <= maxE; e++) {
-        const row = eventMarks.find((m: any) => m.slot_number === slot && m.entry_index === e)
+        const row = eventMarks.find((m: any) => m.slot_number === slot && (m.entry_index ?? 1) === e)
         d[slot][e] = row ? String(row.total) : ''
       }
     })
@@ -125,8 +123,16 @@ export default function AdminManualMarksPage() {
     if (!res.ok) { const j = await res.json(); showFlash('Error saving: ' + (j.error ?? 'Unknown')); setSaving(false); return }
 
     showFlash('Marks saved ✓')
-    const { data: freshMk } = await supabase.from('marks').select('*').eq('event_id', selectedEvent.id)
-    setEventMarks(freshMk ?? [])
+    // Re-fetch marks for the event via service role
+    const mkRes = await fetch('/api/admin/load-guest-marks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventIds: [selectedEvent.id] }),
+    })
+    if (mkRes.ok) {
+      const { manualMarks: freshMk } = await mkRes.json()
+      setEventMarks(freshMk ?? [])
+    }
     setMarksIndex(prev => new Set([...prev, selectedEvent.id]))
     setSaving(false)
   }
@@ -135,9 +141,15 @@ export default function AdminManualMarksPage() {
     if (!selectedEvent) return
     setComputing(true)
 
-    const eventMarkRows = eventMarks.length > 0
-      ? eventMarks
-      : (await supabase.from('marks').select('*').eq('event_id', selectedEvent.id)).data ?? []
+    let eventMarkRows = eventMarks
+    if (eventMarkRows.length === 0) {
+      const mkRes = await fetch('/api/admin/load-guest-marks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventIds: [selectedEvent.id] }),
+      })
+      if (mkRes.ok) { const { manualMarks: fresh } = await mkRes.json(); eventMarkRows = fresh ?? [] }
+    }
 
     if (eventMarkRows.length === 0) {
       showFlash('❌ No marks saved yet. Save marks first.')
@@ -164,16 +176,12 @@ export default function AdminManualMarksPage() {
       rank += 1; i += tied.length
     }
 
-    const { error } = await supabase.from('results').upsert({
-      event_id: selectedEvent.id,
-      first_slot: groups[0]?.entries[0]?.slot ?? null,
-      second_slot: groups[1]?.entries[0]?.slot ?? null,
-      third_slot: groups[2]?.entries[0]?.slot ?? null,
-      winners_json: JSON.stringify(groups),
-      published: false,
-    }, { onConflict: 'event_id' })
-
-    if (error) { showFlash(`❌ ${error.message}`); setComputing(false); return }
+    const res = await fetch('/api/admin/compute-result', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId: selectedEvent.id, winnersJson: JSON.stringify(groups) }),
+    })
+    if (!res.ok) { const j = await res.json(); showFlash(`❌ ${j.error ?? 'Failed to compute'}`); setComputing(false); return }
 
     showFlash('Winners computed ✓')
     await load()
@@ -185,10 +193,12 @@ export default function AdminManualMarksPage() {
     const result = results[selectedEvent.id]
     if (!result) return
     setPublishing(true)
-    const { error } = await supabase.from('results')
-      .update({ published: !result.published })
-      .eq('event_id', selectedEvent.id)
-    if (error) { showFlash(`❌ ${error.message}`); setPublishing(false); return }
+    const res = await fetch('/api/admin/toggle-publish', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId: selectedEvent.id, published: !result.published }),
+    })
+    if (!res.ok) { const j = await res.json(); showFlash(`❌ ${j.error ?? 'Failed to update'}`); setPublishing(false); return }
     showFlash(result.published ? 'Result unpublished.' : 'Result published to schools ✓')
     await load()
     setPublishing(false)

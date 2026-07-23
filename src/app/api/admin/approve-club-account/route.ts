@@ -40,6 +40,29 @@ async function getCallerUser() {
   return user
 }
 
+// PATCH: set status to 'rejected' or other non-approved statuses
+export async function PATCH(req: NextRequest) {
+  const role = await getCallerRole()
+  if (role !== 'final_year' && role !== 'super_admin' && role !== 'club_member') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  }
+
+  const { accountId, status, email } = await req.json()
+  if (!accountId || !status) return NextResponse.json({ error: 'Missing accountId or status' }, { status: 400 })
+
+  const admin = adminClient()
+  const { error } = await admin
+    .from('club_accounts')
+    .update({ status, reviewed_at: new Date().toISOString() })
+    .eq('id', accountId)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  const caller = await getCallerUser()
+  await logActivity({ action: `${status}_club_account`, actorEmail: caller?.email, actorRole: role, targetEmail: email ?? null, targetId: accountId })
+
+  return NextResponse.json({ ok: true })
+}
+
 export async function POST(req: NextRequest) {
   const role = await getCallerRole()
   if (role !== 'final_year' && role !== 'super_admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })

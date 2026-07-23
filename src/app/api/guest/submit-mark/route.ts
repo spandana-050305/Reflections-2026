@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
 function adminClient() {
   return createClient(
@@ -9,7 +11,24 @@ function adminClient() {
   )
 }
 
+async function getCallerRole(): Promise<string | null> {
+  const cookieStore = cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (n: string) => cookieStore.get(n)?.value, set() {}, remove() {} } }
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+  return user?.user_metadata?.role ?? null
+}
+
 export async function POST(request: Request) {
+  // Accept any authenticated user (guest judges, admin, etc.)
+  const role = await getCallerRole()
+  if (!role) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  }
+
   const { eventId, judgeNumber, judgeName, slotNumber, entryIndex, criteriaScores, judgeTotal } = await request.json()
 
   if (!eventId || !judgeNumber || !judgeName || !slotNumber) {
