@@ -213,18 +213,23 @@ export default function GuestEvaluatePage() {
     const criteriaScores = scores[key] ?? emptyScores()
     const judgeTotal = criteriaScores.reduce((a, b) => a + (Number(b) || 0), 0)
 
-    const { error } = await supabase.from('guest_marks').upsert({
-      event_id: event.id,
-      judge_number: judgeNumber,
-      judge_name: judgeName.trim(),
-      slot_number: r.slot_number,
-      entry_index: r.entry_index,
-      criteria_scores: criteriaScores,
-      judge_total: judgeTotal,
-    }, { onConflict: 'event_id,judge_number,slot_number,entry_index' })
+    const res = await fetch('/api/guest/submit-mark', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventId: event.id,
+        judgeNumber,
+        judgeName: judgeName.trim(),
+        slotNumber: r.slot_number,
+        entryIndex: r.entry_index,
+        criteriaScores,
+        judgeTotal,
+      }),
+    })
 
-    if (error) {
-      setSubmitError('Error saving marks: ' + error.message)
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      setSubmitError('Error saving marks: ' + (j.error ?? 'Unknown error'))
       setSavingRow(null)
       return
     }
