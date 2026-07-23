@@ -40,27 +40,22 @@ export default function AdminManualMarksPage() {
   useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current) }, [])
 
   async function load() {
-    const [
-      { data: cats, error: catsErr },
-      { data: evs,  error: evsErr  },
-      { data: sc,   error: scErr   },
-      { data: mk,   error: mkErr   },
-      { data: res,  error: resErr  },
-    ] = await Promise.all([
+    const [{ data: cats }, { data: evs }, adminData] = await Promise.all([
       supabase.from('categories').select('*').order('display_order'),
       supabase.from('events').select('*').order('name'),
-      supabase.from('schools').select('slot_number, school_name').order('slot_number'),
-      supabase.from('marks').select('event_id'),
-      supabase.from('results').select('*'),
+      fetch('/api/admin/load-admin-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tables: ['schools', 'marks', 'results'] }),
+      }).then(r => r.json()),
     ])
-    const firstErr = catsErr ?? evsErr ?? scErr ?? mkErr ?? resErr
-    if (firstErr) { showFlash(`❌ Failed to load: ${firstErr.message}`); setLoading(false); return }
+    if (!cats || !evs) { showFlash('❌ Failed to load data'); setLoading(false); return }
     setCategories(cats ?? [])
     setEvents((evs as Event[]) ?? [])
-    setSchools(sc ?? [])
-    setMarksIndex(new Set((mk ?? []).map((m: any) => m.event_id)))
+    setSchools(adminData?.schools ?? [])
+    setMarksIndex(new Set((adminData?.marks ?? []).map((m: any) => m.event_id)))
     const resMap: Record<string, any> = {}
-    ;(res ?? []).forEach((r: any) => { resMap[r.event_id] = r })
+    ;(adminData?.results ?? []).forEach((r: any) => { resMap[r.event_id] = r })
     setResults(resMap)
     if (cats?.[0]) setSelectedCat(prev => prev || cats[0].id)
     setLoading(false)
@@ -167,7 +162,7 @@ export default function AdminManualMarksPage() {
     const groups: WinnerGroup[] = []
     let rank = 1, i = 0
     while (i < sorted.length && groups.length < 3) {
-      const tied = sorted.filter(x => Number(x.total) === Number(sorted[i].total))
+      const tied = sorted.filter(x => Math.round(Number(x.total) * 100) === Math.round(Number(sorted[i].total) * 100))
       groups.push({
         rank,
         total: Number(sorted[i].total),

@@ -42,16 +42,17 @@ export default function AdminEventsPage() {
     const firstErr = catsErr ?? evsErr
     if (firstErr) { setMessage(`❌ Failed to load: ${firstErr.message}`); setLoading(false); return }
 
-    // Auto-create any missing A/B/C/D categories
+    // Auto-create any missing A/B/C/D categories via service role
     const existing = new Set((cats ?? []).map((c: any) => c.name))
     const missing = ['A', 'B', 'C', 'D'].filter(n => !existing.has(n))
     if (missing.length > 0) {
-      await supabase.from('categories').insert(
-        missing.map(n => ({ name: n, display_order: ['A', 'B', 'C', 'D'].indexOf(n) + 1 }))
-      )
-      // Refetch regardless of insert error (some may already exist)
-      const { data: fresh } = await supabase.from('categories').select('*').order('display_order')
-      setCategories(fresh ?? cats ?? [])
+      const seedRes = await fetch('/api/admin/seed-categories', { method: 'POST' })
+      if (seedRes.ok) {
+        const { categories: fresh } = await seedRes.json()
+        setCategories(fresh ?? cats ?? [])
+      } else {
+        setCategories(cats ?? [])
+      }
     } else {
       setCategories(cats ?? [])
     }

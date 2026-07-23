@@ -30,8 +30,11 @@ export async function POST(request: Request) {
   }
 
   const { eventId, slot, entry, locked, rows } = await request.json()
-  if (!eventId || slot == null || entry == null) {
+  if (!eventId || slot == null || entry == null || locked == null) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  }
+  if (!Array.isArray(rows)) {
+    return NextResponse.json({ error: 'rows must be an array' }, { status: 400 })
   }
 
   const admin = adminClient()

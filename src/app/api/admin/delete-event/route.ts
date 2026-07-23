@@ -44,12 +44,14 @@ export async function DELETE(request: Request) {
   if (!eventId) return NextResponse.json({ error: 'eventId required' }, { status: 400 })
 
   const admin = adminClient()
-  await Promise.all([
+  const cascadeResults = await Promise.all([
     admin.from('participants').delete().eq('event_id', eventId),
     admin.from('marks').delete().eq('event_id', eventId),
     admin.from('guest_marks').delete().eq('event_id', eventId),
     admin.from('results').delete().eq('event_id', eventId),
   ])
+  const cascadeError = cascadeResults.find(r => r.error)?.error
+  if (cascadeError) return NextResponse.json({ error: `Cascade delete failed: ${cascadeError.message}` }, { status: 500 })
 
   const { error } = await admin.from('events').delete().eq('id', eventId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

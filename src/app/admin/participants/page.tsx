@@ -67,22 +67,30 @@ export default function AdminParticipantsPage() {
 
   async function loadParticipants(eventId: string) {
     if (!eventId) { setParticipants([]); return }
-    const { data, error } = await supabase
-      .from('participants').select('*')
-      .eq('event_id', eventId)
-      .order('slot_number').order('entry_index').order('member_index')
-    if (error) { flash(`❌ Failed to load participants: ${error.message}`); return }
-    setParticipants(data ?? [])
+    const res = await fetch('/api/admin/load-admin-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tables: ['participants'] }),
+    })
+    if (!res.ok) { flash('❌ Failed to load participants'); return }
+    const data = await res.json()
+    setParticipants((data.participants ?? []).filter((p: any) => p.event_id === eventId))
   }
 
   async function loadOnspots() {
-    const { data, error } = await supabase.from('onspot_registrations').select('*').order('created_at', { ascending: false })
-    if (error) { flash(`❌ Failed to load on-spot registrations: ${error.message}`); return }
-    setOnspots(data ?? [])
+    const res = await fetch('/api/admin/load-admin-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tables: ['onspot_registrations'] }),
+    })
+    if (!res.ok) { flash('❌ Failed to load on-spot registrations'); return }
+    const data = await res.json()
+    setOnspots(data.onspot_registrations ?? [])
   }
 
   async function loadAllParticipants() {
     if (searchLoaded) return
+    // Load all participants with event info via anon client (needs JOIN)
     const { data, error } = await supabase
       .from('participants')
       .select('*, events(name, categories(name))')
@@ -121,9 +129,16 @@ export default function AdminParticipantsPage() {
     const ev = events.find(e => e.id === evId)
     if (!ev) { flash('❌ Event not found.'); return }
 
-    const { data: existing, error: existErr } = await supabase.from('participants').select('entry_index').eq('slot_number', slotNum).eq('event_id', evId)
-    if (existErr) { flash(`❌ Could not verify entry count: ${existErr.message}`); return }
-    const distinctEntries = new Set((existing ?? []).map((r: any) => r.entry_index ?? 1)).size
+    // Use service role to check entry count (bypasses RLS)
+    const countRes = await fetch('/api/admin/load-guest-marks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventIds: [evId] }),
+    })
+    if (!countRes.ok) { flash('❌ Could not verify entry count'); return }
+    const countData = await countRes.json()
+    const existing = (countData.participants ?? []).filter((p: any) => p.slot_number === slotNum)
+    const distinctEntries = new Set(existing.map((r: any) => r.entry_index ?? 1)).size
     if (distinctEntries >= (ev.max_entries ?? 1)) {
       const schoolName = schools.find(s => s.slot_number === slotNum)?.school_name ?? `Slot ${slotNum}`
       flash(`❌ ${schoolName} has already reached the maximum ${ev.max_entries} entries for ${ev.name}.`)
@@ -187,15 +202,16 @@ export default function AdminParticipantsPage() {
     const ev = events.find(e => e.id === eventId)
     if (!ev) return
 
-    // Load participants for this event (may differ from currently selected)
-    let pts = participants
-    if (eventId !== selectedEvent) {
-      const { data, error } = await supabase
-        .from('participants').select('*')
-        .eq('event_id', eventId)
-        .order('slot_number').order('entry_index').order('member_index')
-      if (error) { flash(`❌ Export failed: ${error.message}`); return }
-      pts = data ?? []
+    let pts = participants.filter((p: any) => p.event_id === eventId)
+    if (pts.length === 0 && eventId !== selectedEvent) {
+      const res = await fetch('/api/admin/load-guest-marks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventIds: [eventId] }),
+      })
+      if (!res.ok) { flash('❌ Export failed'); return }
+      const data = await res.json()
+      pts = data.participants ?? []
     }
 
     buildAndPrintPDF(ev, pts)
@@ -256,14 +272,16 @@ export default function AdminParticipantsPage() {
     const ev = events.find(e => e.id === eventId)
     if (!ev) return
 
-    let pts = participants
-    if (eventId !== selectedEvent) {
-      const { data, error } = await supabase
-        .from('participants').select('*')
-        .eq('event_id', eventId)
-        .order('slot_number').order('entry_index').order('member_index')
-      if (error) { flash(`❌ Export failed: ${error.message}`); return }
-      pts = data ?? []
+    let pts = participants.filter((p: any) => p.event_id === eventId)
+    if (pts.length === 0 && eventId !== selectedEvent) {
+      const res = await fetch('/api/admin/load-guest-marks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventIds: [eventId] }),
+      })
+      if (!res.ok) { flash('❌ Export failed'); return }
+      const data = await res.json()
+      pts = data.participants ?? []
     }
 
     buildAndDownloadExcel(ev, pts)
@@ -377,12 +395,12 @@ export default function AdminParticipantsPage() {
 
           {slots.map(slot => {
             const slotParts = participants.filter(p => p.slot_number === slot)
-            const entries = [...new Set(slotParts.map(p => p.entry_index))].sort((a, b) => a - b)
+            const entries = [...new Set(slotParts.map(p => p.entry_index ?? 1))].sort((a, b) => a - b)
             return (
               <div key={slot} className="card space-y-3">
                 <h3 className="font-semibold text-gray-700">Slot {slot} — {schoolMap[slot] ?? '—'}</h3>
                 {entries.map(entry => {
-                  const members = slotParts.filter(p => p.entry_index === entry).sort((a, b) => a.member_index - b.member_index)
+                  const members = slotParts.filter(p => (p.entry_index ?? 1) === entry).sort((a, b) => a.member_index - b.member_index)
                   return (
                     <div key={entry} className="border border-gray-100 rounded-xl overflow-hidden">
                       {(selectedEventObj?.max_entries ?? 1) > 1 && (

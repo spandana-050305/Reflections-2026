@@ -348,7 +348,7 @@ export default function AdminGuestMarksPage() {
     const groups: WinnerGroup[] = []
     let rank = 1, i = 0
     while (i < seList.length && groups.length < 3) {
-      const tied = seList.filter(x => x.total === seList[i].total)
+      const tied = seList.filter(x => Math.round(x.total * 100) === Math.round(seList[i].total * 100))
       groups.push({ rank, total: seList[i].total, entries: tied.map(x => ({ slot: x.slot, entry: x.entry, names: x.names })) })
       rank += 1; i += tied.length
     }

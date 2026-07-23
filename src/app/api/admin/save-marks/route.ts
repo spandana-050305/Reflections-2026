@@ -58,8 +58,10 @@ export async function DELETE(request: Request) {
   if (!eventId) return NextResponse.json({ error: 'Missing eventId' }, { status: 400 })
 
   const admin = adminClient()
-  await admin.from('marks').delete().eq('event_id', eventId)
-  await admin.from('results').delete().eq('event_id', eventId)
+  const { error: delMarks } = await admin.from('marks').delete().eq('event_id', eventId)
+  if (delMarks) return NextResponse.json({ error: delMarks.message }, { status: 500 })
+  const { error: delResults } = await admin.from('results').delete().eq('event_id', eventId)
+  if (delResults) return NextResponse.json({ error: delResults.message }, { status: 500 })
 
   return NextResponse.json({ ok: true })
 }

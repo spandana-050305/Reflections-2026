@@ -85,14 +85,17 @@ export default function AdminSettingsPage() {
     if (!pwForm.password.trim()) { showPwMsg('Enter a password.', 'error'); return }
     if (!pwForm.a1.trim() || !pwForm.a2.trim()) { showPwMsg('Answer both security questions.', 'error'); return }
     setPwSaving(true)
-    const { error } = await supabase.from('settings').upsert({
-      id: 1,
-      unlock_password: pwForm.password.trim(),
-      security_answer_1: pwForm.a1.trim(),
-      security_answer_2: pwForm.a2.trim(),
-    }, { onConflict: 'id' })
+    const res = await fetch('/api/admin/update-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        unlock_password: pwForm.password.trim(),
+        security_answer_1: pwForm.a1.trim(),
+        security_answer_2: pwForm.a2.trim(),
+      }),
+    })
     setPwSaving(false)
-    if (error) { showPwMsg(`❌ ${error.message}`, 'error'); return }
+    if (!res.ok) { const j = await res.json(); showPwMsg(`❌ ${j.error ?? 'Failed to save'}`, 'error'); return }
     setHasUnlockPassword(true)
     setStoredAnswers({ a1: pwForm.a1.trim(), a2: pwForm.a2.trim() })
     setPwForm({ password: '', a1: '', a2: '' })
@@ -106,9 +109,13 @@ export default function AdminSettingsPage() {
     }
     if (!resetForm.password.trim()) { showPwMsg('Enter a new password.', 'error'); return }
     setPwSaving(true)
-    const { error } = await supabase.from('settings').upsert({ id: 1, unlock_password: resetForm.password.trim() }, { onConflict: 'id' })
+    const res = await fetch('/api/admin/update-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unlock_password: resetForm.password.trim() }),
+    })
     setPwSaving(false)
-    if (error) { showPwMsg(`❌ ${error.message}`, 'error'); return }
+    if (!res.ok) { const j = await res.json(); showPwMsg(`❌ ${j.error ?? 'Failed to reset'}`, 'error'); return }
     setResetForm({ a1: '', a2: '', password: '' })
     setShowReset(false)
     showPwMsg('Unlock password reset.')
@@ -124,9 +131,13 @@ export default function AdminSettingsPage() {
     const action = newValue ? 'open' : 'close'
     if (!confirm(`Are you sure you want to ${action} registration? ${!newValue ? 'Schools will no longer be able to edit participants.' : 'Schools will be able to edit their participants again.'}`)) return
     setSaving(true)
-    const { error } = await supabase.from('settings').upsert({ id: 1, registration_open: newValue }, { onConflict: 'id' })
+    const res = await fetch('/api/admin/update-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ registration_open: newValue }),
+    })
     setSaving(false)
-    if (error) { setMessage(`❌ ${error.message}`); if (regMsgTimer.current) clearTimeout(regMsgTimer.current); regMsgTimer.current = setTimeout(() => setMessage(''), 4000); return }
+    if (!res.ok) { const j = await res.json(); setMessage(`❌ ${j.error ?? 'Failed to update'}`); if (regMsgTimer.current) clearTimeout(regMsgTimer.current); regMsgTimer.current = setTimeout(() => setMessage(''), 4000); return }
     setRegistrationOpen(newValue)
     setMessage(`Registration is now ${newValue ? 'OPEN' : 'CLOSED'}.`)
     if (regMsgTimer.current) clearTimeout(regMsgTimer.current)

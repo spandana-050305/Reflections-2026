@@ -51,28 +51,26 @@ export default function AdminResultsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user?.email) setCurrentUserEmail(user.email)
 
-    const [
-      { data: cats, error: catsErr },
-      { data: evs,  error: evsErr  },
-      { data: sc,   error: scErr   },
-      { data: res,  error: resErr  },
-      { data: stg,  error: stgErr  },
-      { data: mk,   error: mkErr   },
-    ] = await Promise.all([
+    // Use service role API for marks and results (bypasses RLS)
+    const [{ data: cats }, { data: evs }, adminData] = await Promise.all([
       supabase.from('categories').select('*').order('display_order'),
       supabase.from('events').select('*').order('name'),
-      supabase.from('schools').select('slot_number, school_name').order('slot_number'),
-      supabase.from('results').select('*'),
-      supabase.from('settings').select('points_1st, points_2nd, points_3rd').maybeSingle(),
-      supabase.from('marks').select('event_id, slot_number, entry_index, total'),
+      fetch('/api/admin/load-admin-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tables: ['schools', 'results', 'marks', 'settings'] }),
+      }).then(r => r.json()),
     ])
-    const firstErr = catsErr ?? evsErr ?? scErr ?? resErr ?? stgErr ?? mkErr
-    if (firstErr) { showMessage(`❌ Failed to load: ${firstErr.message}`); setLoading(false); return }
+    const sc = adminData?.schools ?? []
+    const res = adminData?.results ?? []
+    const mk = adminData?.marks ?? []
+    const stg = adminData?.settings?.[0] ?? null
+    if (!cats || !evs) { showMessage('❌ Failed to load data'); setLoading(false); return }
     setCategories(cats ?? [])
     setEvents(evs ?? [])
-    setSchools(sc ?? [])
-    setResults(res ?? [])
-    setManualMarks(mk ?? [])
+    setSchools(sc)
+    setResults(res)
+    setManualMarks(mk)
     if (stg) setRankPts({ 1: stg.points_1st ?? 15, 2: stg.points_2nd ?? 10, 3: stg.points_3rd ?? 5 })
     if (cats?.[0]) setSelectedCat(prev => prev || cats[0].id)
     setLoading(false)
@@ -102,7 +100,7 @@ export default function AdminResultsPage() {
     const groups: { rank: number; total: number; entries: { slot: number; entry: number; names: string }[] }[] = []
     let rank = 1, i = 0
     while (i < sorted.length && groups.length < 3) {
-      const tied = sorted.filter(x => x.total === sorted[i].total)
+      const tied = sorted.filter(x => Math.round(Number(x.total) * 100) === Math.round(Number(sorted[i].total) * 100))
       groups.push({
         rank,
         total: Number(sorted[i].total),

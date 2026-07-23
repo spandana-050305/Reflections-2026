@@ -17,7 +17,7 @@ export default function AdminAnnouncementsPage() {
 
   async function load() {
     const { data, error } = await supabase.from('announcements').select('*').order('created_at', { ascending: false })
-    if (error) { setMessage(`❌ Failed to load announcements: ${error.message}`) }
+    if (error) { setMessage(`❌ Failed to load announcements: ${error.message}`); setLoading(false); return }
     setAnnouncements(data ?? [])
     setLoading(false)
   }
@@ -28,9 +28,13 @@ export default function AdminAnnouncementsPage() {
     if (!form.title || !form.message) return
     setSaving(true)
     setMessage('')
-    const { error } = await supabase.from('announcements').insert({ title: form.title, message: form.message })
+    const res = await fetch('/api/admin/announcements', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: form.title, message: form.message }),
+    })
     setSaving(false)
-    if (error) { setMessage(`❌ ${error.message}`); return }
+    if (!res.ok) { const j = await res.json(); setMessage(`❌ ${j.error ?? 'Failed to post'}`); return }
     setForm({ title: '', message: '' })
     setShowForm(false)
     await load()
@@ -38,8 +42,12 @@ export default function AdminAnnouncementsPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this announcement?')) return
-    const { error } = await supabase.from('announcements').delete().eq('id', id)
-    if (error) { setMessage(`❌ ${error.message}`); return }
+    const res = await fetch('/api/admin/announcements', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    if (!res.ok) { const j = await res.json(); setMessage(`❌ ${j.error ?? 'Delete failed'}`); return }
     await load()
   }
 

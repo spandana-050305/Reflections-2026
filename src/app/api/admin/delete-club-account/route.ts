@@ -49,12 +49,14 @@ export async function DELETE(req: NextRequest) {
 
   const admin = adminClient()
 
+  // Grab user_id before deleting the row
+  const { data: acct } = await admin.from('club_accounts').select('user_id').eq('id', accountId).single()
   await admin.from('club_accounts').delete().eq('id', accountId)
 
-  const { data: listData, error: listErr } = await admin.auth.admin.listUsers()
-  if (listErr) return NextResponse.json({ error: listErr.message }, { status: 500 })
-  const authUser = listData.users.find((u: any) => u.email === email)
-  if (authUser) await admin.auth.admin.deleteUser(authUser.id)
+  // Delete auth user directly by ID (avoids listing all users)
+  if (acct?.user_id) {
+    await admin.auth.admin.deleteUser(acct.user_id)
+  }
 
   const caller = await getCallerUser()
   await logActivity({ action: 'delete_club_account', actorEmail: caller?.email, actorRole: role, targetEmail: email, targetId: accountId })

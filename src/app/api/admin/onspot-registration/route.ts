@@ -35,6 +35,7 @@ export async function POST(request: Request) {
       event_id: eventId,
       participant_name: participantName,
       amount_paid: amountPaid ?? false,
+      entry_index: entryIndex ?? 1,
       created_at: new Date().toISOString(),
     })
     .select('id')
@@ -74,14 +75,17 @@ export async function DELETE(request: Request) {
   const { onspotId, slotNumber, eventId, participantName, entryIndex } = await request.json()
   const admin = adminClient()
 
-  await admin.from('onspot_registrations').delete().eq('id', onspotId)
-  await admin.from('participants')
+  const { error: delOnspot } = await admin.from('onspot_registrations').delete().eq('id', onspotId)
+  if (delOnspot) return NextResponse.json({ error: delOnspot.message }, { status: 500 })
+
+  const { error: delPart } = await admin.from('participants')
     .delete()
     .eq('slot_number', slotNumber)
     .eq('event_id', eventId)
     .eq('participant_name', participantName)
     .eq('entry_index', entryIndex ?? 1)
     .eq('member_index', 1)
+  if (delPart) return NextResponse.json({ error: delPart.message }, { status: 500 })
 
   return NextResponse.json({ ok: true })
 }

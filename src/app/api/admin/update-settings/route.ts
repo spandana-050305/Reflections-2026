@@ -28,8 +28,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
   const body = await request.json()
+  // Whitelist allowed fields to prevent overwriting arbitrary columns
+  const ALLOWED = ['points_1st', 'points_2nd', 'points_3rd', 'registration_open', 'unlock_password', 'security_answer_1', 'security_answer_2'] as const
+  const patch: Record<string, unknown> = {}
+  for (const key of ALLOWED) {
+    if (key in body) patch[key] = body[key]
+  }
+  if (Object.keys(patch).length === 0) {
+    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+  }
   const admin = adminClient()
-  const { error } = await admin.from('settings').upsert({ id: 1, ...body }, { onConflict: 'id' })
+  const { error } = await admin.from('settings').upsert({ id: 1, ...patch }, { onConflict: 'id' })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
