@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
     login_id: loginId,
     email,
     password_plain: password,
+    auth_user_id: data.user.id,
   })
 
   if (dbErr) {
@@ -98,12 +99,15 @@ export async function DELETE(req: NextRequest) {
 
   const admin = adminClient()
 
-  // Find the auth user by email and delete them
-  const { data: listData, error: listErr } = await admin.auth.admin.listUsers()
-  if (listErr) return NextResponse.json({ error: listErr.message }, { status: 500 })
-  const authUser = listData.users.find((u: any) => u.email === email)
-  if (authUser) {
-    await admin.auth.admin.deleteUser(authUser.id)
+  // Prefer the stored auth_user_id; fall back to listUsers for legacy rows
+  const { data: credRow } = await admin.from('guest_credentials').select('auth_user_id').eq('id', credId).maybeSingle()
+  if (credRow?.auth_user_id) {
+    await admin.auth.admin.deleteUser(credRow.auth_user_id)
+  } else {
+    const { data: listData, error: listErr } = await admin.auth.admin.listUsers()
+    if (listErr) return NextResponse.json({ error: listErr.message }, { status: 500 })
+    const authUser = listData.users.find((u: any) => u.email === email)
+    if (authUser) await admin.auth.admin.deleteUser(authUser.id)
   }
 
   // Delete from guest_credentials table
