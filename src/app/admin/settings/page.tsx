@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase'
 import { Settings, Lock, Unlock, Plus, Trash2, Copy, Eye, EyeOff, FileDown, KeyRound, X, Save, Layers, ShieldCheck } from 'lucide-react'
 import PageSpinner from '@/components/layout/PageSpinner'
 import * as XLSX from 'xlsx'
@@ -21,7 +20,6 @@ function loginIdToEmail(loginId: string): string {
 }
 
 export default function AdminSettingsPage() {
-  const supabase = createClient()
   const [registrationOpen, setRegistrationOpen] = useState(true)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -67,13 +65,24 @@ export default function AdminSettingsPage() {
 
   useEffect(() => {
     async function loadSettings() {
-      const { data, error } = await supabase.from('settings').select('*').maybeSingle()
-      if (error) {
-        setMessage(`❌ Failed to load settings: ${error.message}`)
-      } else if (data) {
-        setRegistrationOpen(data.registration_open)
-        setHasUnlockPassword(!!data.unlock_password)
-        setStoredAnswers({ a1: data.security_answer_1 ?? '', a2: data.security_answer_2 ?? '' })
+      // Service role read — settings contains the unlock password + security
+      // answers, which must not depend on (or leak through) anon RLS policies.
+      const res = await fetch('/api/admin/load-admin-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tables: ['settings'] }),
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        setMessage(`❌ Failed to load settings: ${j.error ?? 'Unknown error'}`)
+      } else {
+        const json = await res.json()
+        const data = json.settings?.[0]
+        if (data) {
+          setRegistrationOpen(data.registration_open)
+          setHasUnlockPassword(!!data.unlock_password)
+          setStoredAnswers({ a1: data.security_answer_1 ?? '', a2: data.security_answer_2 ?? '' })
+        }
       }
       setLoading(false)
     }
@@ -122,9 +131,15 @@ export default function AdminSettingsPage() {
   }
 
   async function loadGuestCreds() {
-    const { data, error } = await supabase.from('guest_credentials').select('*').order('login_id')
-    if (error) { showGMsg(`❌ Failed to load credentials: ${error.message}`, 'error'); return }
-    setGuestCreds(data ?? [])
+    // Service role read — guest_credentials holds plaintext judge passwords
+    const res = await fetch('/api/admin/create-guest')
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      showGMsg(`❌ Failed to load credentials: ${j.error ?? 'Unknown error'}`, 'error')
+      return
+    }
+    const { credentials } = await res.json()
+    setGuestCreds(credentials ?? [])
   }
 
   async function handleToggle(newValue: boolean) {

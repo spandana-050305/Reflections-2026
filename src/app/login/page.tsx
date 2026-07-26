@@ -35,32 +35,18 @@ export default function LoginPage() {
     if (!slug) { setError('Please enter a valid login ID (letters, numbers, . _ -).'); return }
     if (regPassword.length < 4) { setError('Password must be at least 4 characters.'); return }
     setLoading(true)
-    const regEmail = `${slug}@reflections.in`
 
     try {
-      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-        email: regEmail,
-        password: regPassword,
-        options: { data: { role: regRole } },
+      // Server-side registration: creates the auth user AND club_accounts row
+      // atomically (rolls back the auth user if the row insert fails).
+      const res = await fetch('/api/register-club-member', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: regName.trim(), loginId: slug, password: regPassword, role: regRole }),
       })
-      if (signUpErr) {
-        setError(signUpErr.message.includes('already') ? `Login ID "${slug}" is already taken.` : signUpErr.message)
-        setLoading(false)
-        return
-      }
-      const { error: dbErr } = await supabase.from('club_accounts').insert({
-        name: regName.trim(),
-        login_id: slug,
-        email: regEmail,
-        role: regRole,
-        status: 'pending',
-        user_id: signUpData?.user?.id ?? null,
-        created_at: new Date().toISOString(),
-      })
-      if (dbErr) {
-        // Sign out the orphaned auth user we just created so they can't accidentally log in
-        await supabase.auth.signOut()
-        setError(`Registration failed: ${dbErr.message}. Please try again or contact the admin.`)
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(json.error ?? 'Registration failed. Please try again.')
         setLoading(false)
         return
       }

@@ -77,7 +77,7 @@ export default function EventDetailPage() {
           const members: string[] = []
           for (let m = 1; m <= memberCount; m++) {
             const found = (participants ?? []).find(
-              (p: Participant) => p.entry_index === e && p.member_index === m
+              (p: Participant) => (p.entry_index ?? 1) === e && (p.member_index ?? 1) === m
             )
             members.push(found?.participant_name ?? '')
           }

@@ -125,11 +125,11 @@ export default function ClubParticipantsPage() {
     const tableRows: string[][] = []
     slots.forEach(slot => {
       const schoolName = schoolMap[slot] ?? '—'
-      const entries = [...new Set(pts.filter((p: any) => p.slot_number === slot).map((p: any) => p.entry_index))].sort((a: number, b: number) => a - b)
+      const entries = [...new Set(pts.filter((p: any) => p.slot_number === slot).map((p: any) => p.entry_index ?? 1))].sort((a: number, b: number) => a - b)
       entries.forEach(entry => {
         const members = pts
-          .filter((p: any) => p.slot_number === slot && p.entry_index === entry)
-          .sort((a: any, b: any) => a.member_index - b.member_index)
+          .filter((p: any) => p.slot_number === slot && (p.entry_index ?? 1) === entry)
+          .sort((a: any, b: any) => (a.member_index ?? 1) - (b.member_index ?? 1))
         members.forEach((m: any) => {
           const row: string[] = [`Slot ${slot}\n${schoolName}`]
           if (multiEntry) row.push(`Entry ${entry}`)
@@ -181,11 +181,11 @@ export default function ClubParticipantsPage() {
     const rows: any[] = []
     slots.forEach(slot => {
       const schoolName = schoolMap[slot] ?? '—'
-      const entries = [...new Set(pts.filter((p: any) => p.slot_number === slot).map((p: any) => p.entry_index))].sort((a: number, b: number) => a - b)
+      const entries = [...new Set(pts.filter((p: any) => p.slot_number === slot).map((p: any) => p.entry_index ?? 1))].sort((a: number, b: number) => a - b)
       entries.forEach(entry => {
         const members = pts
-          .filter((p: any) => p.slot_number === slot && p.entry_index === entry)
-          .sort((a: any, b: any) => a.member_index - b.member_index)
+          .filter((p: any) => p.slot_number === slot && (p.entry_index ?? 1) === entry)
+          .sort((a: any, b: any) => (a.member_index ?? 1) - (b.member_index ?? 1))
         members.forEach((m: any) => {
           rows.push({
             Slot: slot,
@@ -220,7 +220,7 @@ export default function ClubParticipantsPage() {
 
     const { data: existing, error: existErr } = await supabase.from('participants').select('entry_index').eq('slot_number', slotNum).eq('event_id', evId)
     if (existErr) { flash(`❌ Could not verify entry count: ${existErr.message}`); return }
-    const distinctEntries = new Set((existing ?? []).map((r: any) => r.entry_index)).size
+    const distinctEntries = new Set((existing ?? []).map((r: any) => r.entry_index ?? 1)).size
     if (distinctEntries >= (ev.max_entries ?? 1)) {
       const schoolName = schools.find(s => s.slot_number === slotNum)?.school_name ?? `Slot ${slotNum}`
       flash(`❌ ${schoolName} has already reached the maximum ${ev.max_entries} entries for ${ev.name}.`)
@@ -354,13 +354,13 @@ export default function ClubParticipantsPage() {
 
           {[...new Set(participants.map(p => p.slot_number))].sort((a,b)=>a-b).map(slot => {
             const slotParts = participants.filter(p => p.slot_number === slot)
-            const entries = [...new Set(slotParts.map(p => p.entry_index))].sort((a,b)=>a-b)
+            const entries = [...new Set(slotParts.map(p => p.entry_index ?? 1))].sort((a,b)=>a-b)
             const ev = events.find(e => e.id === selectedEvent)
             return (
               <div key={slot} className="card space-y-2">
                 <h3 className="font-semibold text-gray-700">Slot {slot} — {schoolMap[slot] ?? '—'}</h3>
                 {entries.map(entry => {
-                  const members = slotParts.filter(p => p.entry_index === entry).sort((a,b)=>a.member_index-b.member_index)
+                  const members = slotParts.filter(p => (p.entry_index ?? 1) === entry).sort((a,b)=>(a.member_index ?? 1)-(b.member_index ?? 1))
                   return (
                     <div key={entry} className="border border-gray-100 rounded-xl overflow-hidden">
                       {ev && ev.max_entries > 1 && (

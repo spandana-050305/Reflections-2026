@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase'
 import { UserCheck, Check, X, Clock, CheckCircle2, XCircle, RotateCcw, Trash2, KeyRound } from 'lucide-react'
 import type { ClubAccount, ClubAccountStatus } from '@/lib/types'
 import PageSpinner from '@/components/layout/PageSpinner'
@@ -14,7 +13,6 @@ const FILTERS: { key: ClubAccountStatus | 'all'; label: string }[] = [
 ]
 
 export default function AdminRequestsPage() {
-  const supabase = createClient()
   const [accounts, setAccounts] = useState<ClubAccount[]>([])
   const [filter, setFilter] = useState<ClubAccountStatus | 'all'>('pending')
   const [flashMsg, setFlashMsg] = useState('')
@@ -35,8 +33,15 @@ export default function AdminRequestsPage() {
   useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current) }, [])
 
   async function load() {
-    const { data, error } = await supabase.from('club_accounts').select('*').order('created_at', { ascending: false })
-    if (error) { flash(`❌ Failed to load requests: ${error.message}`); setLoading(false); return }
+    // Service role read — RLS-independent
+    const res = await fetch('/api/admin/approve-club-account')
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      flash(`❌ Failed to load requests: ${j.error ?? 'Unknown error'}`)
+      setLoading(false)
+      return
+    }
+    const { accounts: data } = await res.json()
     setAccounts((data as ClubAccount[]) ?? [])
     setLastRefreshed(new Date())
     setLoading(false)

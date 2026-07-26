@@ -30,6 +30,19 @@ async function getCallerRole(): Promise<string | null> {
   return user?.user_metadata?.role ?? null
 }
 
+// GET — list all guest credentials (service role; RLS-independent)
+export async function GET() {
+  const role = await getCallerRole()
+  if (role !== 'final_year' && role !== 'super_admin') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  }
+
+  const admin = adminClient()
+  const { data, error } = await admin.from('guest_credentials').select('*').order('login_id')
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ credentials: data ?? [] })
+}
+
 export async function POST(req: NextRequest) {
   // Only final_year admins may call this
   const role = await getCallerRole()

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase-server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import { LayoutDashboard, Users, Calendar, Trophy, Clock, XCircle } from 'lucide-react'
 import NavBar from '@/components/layout/NavBar'
@@ -12,7 +13,13 @@ export default async function ClubLayout({ children }: { children: React.ReactNo
 
   // Self-registered club members must be approved by the Super Admin.
   // Seeded / admin-created accounts have no club_accounts row → allowed through.
-  const { data: acct } = await supabase
+  // Uses service role so RLS can never hide the row and bypass this gate.
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+  const { data: acct } = await admin
     .from('club_accounts')
     .select('status, name')
     .eq('email', user.email)

@@ -22,7 +22,7 @@ export default function NavBar({ title, role, slotNumber }: NavBarProps) {
   }
 
   const roleLabel: Record<string, string> = {
-    school: `School · Slot ${slotNumber}`,
+    school: slotNumber != null ? `School · Slot ${slotNumber}` : 'School · Slot not assigned',
     club_member: 'Club Member',
     final_year: 'Final Year',
     guest: 'Guest Evaluator',

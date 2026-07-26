@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase-server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import {
   LayoutDashboard, ListChecks, Users,
@@ -16,8 +17,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   // Self-registered Final Years need approval before getting full access.
   // Seeded / admin-created accounts and super_admin have no club_accounts row → allowed through.
+  // Uses service role so RLS can never hide the row and bypass this gate.
   if (role !== 'super_admin') {
-    const { data: acct } = await supabase
+    const admin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+    const { data: acct } = await admin
       .from('club_accounts')
       .select('status')
       .eq('email', user.email)
