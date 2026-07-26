@@ -205,9 +205,19 @@ export default function ClubParticipantsPage() {
   }
 
   async function loadOnspots() {
-    const { data, error } = await supabase.from('onspot_registrations').select('*').order('created_at', { ascending: false })
-    if (error) { flash(`❌ Failed to load on-spot registrations: ${error.message}`); return }
-    setOnspots(data ?? [])
+    // Service role read — RLS-independent
+    const res = await fetch('/api/admin/load-admin-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tables: ['onspot_registrations'] }),
+    })
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      flash(`❌ Failed to load on-spot registrations: ${j.error ?? 'Unknown error'}`)
+      return
+    }
+    const json = await res.json()
+    setOnspots(json.onspot_registrations ?? [])
   }
 
   async function addOnspot() {
@@ -371,7 +381,7 @@ export default function ClubParticipantsPage() {
                           {editingId === p.id ? (
                             <div className="flex items-center gap-2 flex-1">
                               <input value={editName} onChange={e => setEditName(e.target.value)} className="input flex-1" autoFocus />
-                              <button onClick={async () => { const trimmed = editName.trim(); if (!trimmed) { flash('❌ Name cannot be empty.'); return } const res = await fetch('/api/admin/manage-participant', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, participant_name: trimmed }) }); if (!res.ok) { const j = await res.json().catch(() => ({})); flash(`❌ ${j.error ?? 'Update failed'}`); return } setEditingId(null); loadParticipants(selectedEvent) }} className="btn-primary px-2 py-1"><Check size={14} /></button>
+                              <button onClick={async () => { const trimmed = editName.trim(); if (!trimmed) { flash('❌ Name cannot be empty.'); return } const res = await fetch('/api/admin/manage-participant', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ participantId: p.id, participantName: trimmed }) }); if (!res.ok) { const j = await res.json().catch(() => ({})); flash(`❌ ${j.error ?? 'Update failed'}`); return } setEditingId(null); loadParticipants(selectedEvent) }} className="btn-primary px-2 py-1"><Check size={14} /></button>
                               <button onClick={() => setEditingId(null)} className="btn-secondary px-2 py-1"><X size={14} /></button>
                             </div>
                           ) : (
@@ -379,7 +389,7 @@ export default function ClubParticipantsPage() {
                               <span className="text-sm text-gray-800">{ev?.is_team_event ? `Member ${p.member_index}: ` : ''}{p.participant_name}</span>
                               <div className="flex gap-2">
                                 <button onClick={() => { setEditingId(p.id); setEditName(p.participant_name) }} className="text-gray-400 hover:text-brand-600"><Pencil size={14} /></button>
-                                <button onClick={async () => { const res = await fetch('/api/admin/manage-participant', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id }) }); if (!res.ok) { const j = await res.json().catch(() => ({})); flash(`❌ ${j.error ?? 'Delete failed'}`); return } loadParticipants(selectedEvent) }} className="text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
+                                <button onClick={async () => { const res = await fetch('/api/admin/manage-participant', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ participantId: p.id })}); if (!res.ok) { const j = await res.json().catch(() => ({})); flash(`❌ ${j.error ?? 'Delete failed'}`); return } loadParticipants(selectedEvent) }} className="text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
                               </div>
                             </>
                           )}

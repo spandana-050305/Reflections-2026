@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase'
 import {
   ChevronDown, ChevronRight, Trophy, Users, AlertCircle, ClipboardCheck,
   Pencil, Lock, Unlock, Settings2, ShieldCheck,
@@ -15,8 +14,6 @@ interface WinnerEntry { slot: number; entry: number; names: string }
 interface WinnerGroup { rank: number; total: number; entries: WinnerEntry[] }
 
 export default function AdminGuestMarksPage() {
-  const supabase = createClient()
-
   const [categories, setCategories] = useState<Category[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [selectedCat, setSelectedCat] = useState('')
@@ -67,31 +64,34 @@ export default function AdminGuestMarksPage() {
 
   useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current) }, [])
 
-  // Load small/static tables: categories, events, results, settings
+  // Load small/static tables: categories, events, results, settings.
+  // results + settings go through the service role API (results includes
+  // unpublished rows; settings contains the unlock password).
   async function loadBase(): Promise<{ cats: Category[]; evs: Event[] } | null> {
-    const [
-      { data: cats, error: catsErr },
-      { data: evs,  error: evsErr  },
-      { data: resultData, error: resErr },
-      { data: stg,  error: stgErr  },
-    ] = await Promise.all([
-      supabase.from('categories').select('*').order('display_order'),
-      supabase.from('events').select('*').order('name'),
-      supabase.from('results').select('*'),
-      supabase.from('settings').select('*').maybeSingle(),
-    ])
-    const firstErr = catsErr ?? evsErr ?? resErr ?? stgErr
-    if (firstErr) { flash(`❌ Failed to load: ${firstErr.message}`); return null }
-    setCategories(cats ?? [])
-    setEvents((evs as Event[]) ?? [])
+    const adminRes = await fetch('/api/admin/load-admin-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tables: ['categories', 'events', 'results', 'settings'] }),
+    })
+    if (!adminRes.ok) {
+      const j = await adminRes.json().catch(() => ({}))
+      flash(`❌ Failed to load: ${j.error ?? 'Unknown error'}`)
+      return null
+    }
+    const data = await adminRes.json()
+    const cats = data.categories ?? []
+    const evs = (data.events ?? []) as Event[]
+    setCategories(cats)
+    setEvents(evs)
     const res: Record<string, any> = {}
-    ;(resultData ?? []).forEach((r: any) => { res[r.event_id] = r })
+    ;(data.results ?? []).forEach((r: any) => { res[r.event_id] = r })
     setResults(res)
+    const stg = data.settings?.[0]
     if (stg) {
       setDraftPts({ p1: stg.points_1st ?? 15, p2: stg.points_2nd ?? 10, p3: stg.points_3rd ?? 5 })
       setUnlockPassword(stg.unlock_password ?? '')
     }
-    return { cats: cats ?? [], evs: (evs as Event[]) ?? [] }
+    return { cats, evs }
   }
 
   // Load marks only for events in the selected category — much faster than fetching all rows

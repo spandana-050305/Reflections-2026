@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase'
 import { Plus, Trash2, X, Save, Shuffle, Copy, Check, Eye, EyeOff, KeyRound, FileDown } from 'lucide-react'
 import PageSpinner from '@/components/layout/PageSpinner'
 import jsPDF from 'jspdf'
@@ -24,7 +23,6 @@ function generateEmail(schoolName: string): string {
 }
 
 export default function AdminSchoolsPage() {
-  const supabase = createClient()
   const [schools, setSchools] = useState<any[]>([])
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ school_name: '', slot_number: '' })
@@ -49,8 +47,16 @@ export default function AdminSchoolsPage() {
   const schoolsOrdered = [...schools].sort((a, b) => (a.slot_number ?? 9999) - (b.slot_number ?? 9999))
 
   async function load() {
-    const { data, error } = await supabase.from('schools').select('*').order('slot_number')
-    if (error) { showMsg(`❌ Failed to load schools: ${error.message}`, 'error') }
+    // Service role read — full school rows (incl. password_plain) must never
+    // be readable through the anon client
+    const res = await fetch('/api/admin/manage-school')
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      showMsg(`❌ Failed to load schools: ${j.error ?? 'Unknown error'}`, 'error')
+      setLoading(false)
+      return
+    }
+    const { schools: data } = await res.json()
     setSchools(data ?? [])
     setLoading(false)
   }

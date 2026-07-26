@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase'
 import { Activity, RefreshCw } from 'lucide-react'
 import PageSpinner from '@/components/layout/PageSpinner'
 
@@ -32,19 +31,18 @@ const ACTION_COLORS: Record<string, string> = {
 }
 
 export default function ActivityLogPage() {
-  const supabase = createClient()
   const [logs, setLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
   const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   async function load() {
-    const { data } = await supabase
-      .from('activity_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(200)
-    setLogs(data ?? [])
+    // Service role read — RLS-independent
+    const res = await fetch('/api/superadmin/activity-logs')
+    if (res.ok) {
+      const { logs: data } = await res.json()
+      setLogs(data ?? [])
+    }
     setLastRefreshed(new Date())
     setLoading(false)
   }

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase-server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import { School, ListChecks, ClipboardCheck, Trophy, UserCheck, Users, ShieldCheck } from 'lucide-react'
 
@@ -7,6 +8,14 @@ export default async function SuperAdminDashboard() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
   if (user.user_metadata?.role !== 'super_admin') redirect('/login')
+
+  // Service role reads — several of these tables (club_accounts, guest_marks,
+  // unpublished results) are blocked or filtered by RLS for the anon client.
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
 
   const [
     { data: schools },
@@ -17,13 +26,13 @@ export default async function SuperAdminDashboard() {
     { data: clubAccounts },
     { data: settings },
   ] = await Promise.all([
-    supabase.from('schools').select('id', { count: 'exact' }),
-    supabase.from('events').select('id', { count: 'exact' }),
-    supabase.from('guest_marks').select('event_id', { count: 'exact' }),
-    supabase.from('results').select('event_id, published'),
-    supabase.from('club_accounts').select('id').eq('status', 'pending'),
-    supabase.from('club_accounts').select('id, status, role'),
-    supabase.from('settings').select('registration_open').maybeSingle(),
+    admin.from('schools').select('id', { count: 'exact' }),
+    admin.from('events').select('id', { count: 'exact' }),
+    admin.from('guest_marks').select('event_id', { count: 'exact' }),
+    admin.from('results').select('event_id, published'),
+    admin.from('club_accounts').select('id').eq('status', 'pending'),
+    admin.from('club_accounts').select('id, status, role'),
+    admin.from('settings').select('registration_open').maybeSingle(),
   ])
 
   const totalSchools = schools?.length ?? 0

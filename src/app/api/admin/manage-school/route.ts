@@ -40,6 +40,17 @@ async function getCallerUser() {
   return user
 }
 
+// GET — list all schools with full columns (service role; RLS-independent)
+export async function GET() {
+  const role = await getCallerRole()
+  if (role !== 'final_year' && role !== 'super_admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+
+  const admin = adminClient()
+  const { data, error } = await admin.from('schools').select('*').order('slot_number')
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ schools: data ?? [] })
+}
+
 // POST — create a school
 export async function POST(req: NextRequest) {
   const role = await getCallerRole()
