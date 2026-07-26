@@ -74,7 +74,14 @@ export default function LoginPage() {
       }
 
       const role = data.user?.user_metadata?.role
-      if (role === 'school')           window.location.href = '/school/dashboard'
+      if (role === 'school') {
+        // Schools now have their own dedicated sign-in page — sign this
+        // session back out rather than let it through the organizer login.
+        await supabase.auth.signOut()
+        setError('Schools should sign in from the school login page.')
+        setLoading(false)
+        return
+      }
       else if (role === 'club_member') window.location.href = '/club/dashboard'
       else if (role === 'final_year')  window.location.href = '/admin/dashboard'
       else if (role === 'guest')       window.location.href = '/guest/evaluate'
@@ -156,6 +163,10 @@ export default function LoginPage() {
                 <p className="text-center text-sm text-slate-500 mt-5">
                   Are you a club member?{' '}
                   <button onClick={() => { setMode('register'); setError(''); setRegDone(false) }} className="font-semibold text-brand-600 hover:underline">Register here</button>
+                </p>
+                <p className="text-center text-sm text-slate-500 mt-2">
+                  Are you a school?{' '}
+                  <a href="/school/login" className="font-semibold text-brand-600 hover:underline">School sign in</a>
                 </p>
               </>
             ) : regDone ? (

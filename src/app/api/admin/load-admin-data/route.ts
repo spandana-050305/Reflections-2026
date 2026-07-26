@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     if (table === 'schools') q = admin.from(table).select('slot_number, school_name').order('slot_number') as any
     if (table === 'categories') q = admin.from(table).select('*').order('display_order') as any
     if (table === 'events') q = admin.from(table).select('*').order('name') as any
-    if (table === 'participants') q = admin.from(table).select('*').order('slot_number').order('entry_index').order('member_index') as any
+    if (table === 'participants') q = admin.from(table).select('*, events(name, categories(name))').order('slot_number').order('entry_index').order('member_index') as any
     if (table === 'onspot_registrations') q = admin.from(table).select('*').order('created_at', { ascending: false }) as any
     if (table === 'marks') q = admin.from(table).select('event_id, slot_number, entry_index, total') as any
     const { data, error } = await q

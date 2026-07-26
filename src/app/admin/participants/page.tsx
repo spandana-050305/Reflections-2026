@@ -90,13 +90,18 @@ export default function AdminParticipantsPage() {
 
   async function loadAllParticipants() {
     if (searchLoaded) return
-    // Load all participants with event info via anon client (needs JOIN)
-    const { data, error } = await supabase
-      .from('participants')
-      .select('*, events(name, categories(name))')
-      .order('participant_name')
-    if (error) { flash(`❌ ${error.message}`); return }
-    setAllParticipants(data ?? [])
+    // Load all participants (with event/category join) via service role —
+    // RLS on `participants` only grants final_year/club_member/school roles,
+    // so a super_admin-role session would get zero rows from the anon client.
+    const res = await fetch('/api/admin/load-admin-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tables: ['participants'] }),
+    })
+    if (!res.ok) { flash('❌ Failed to load participants'); return }
+    const data = await res.json()
+    const sorted = [...(data.participants ?? [])].sort((a: any, b: any) => a.participant_name.localeCompare(b.participant_name))
+    setAllParticipants(sorted)
     setSearchLoaded(true)
   }
 
