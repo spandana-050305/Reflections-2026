@@ -111,10 +111,6 @@ export default function SchoolLoginPage() {
                 {loading ? 'Signing in…' : <span className="flex items-center justify-center gap-2">Sign In <ArrowRight size={16} /></span>}
               </button>
             </form>
-            <p className="text-center text-sm text-slate-500 mt-5">
-              Club member, admin, or judge?{' '}
-              <Link href="/login" className="font-semibold text-brand-600 hover:underline">Organizer sign in</Link>
-            </p>
           </div>
         </div>
 
