@@ -17,7 +17,10 @@ export default function NavBar({ title, role, slotNumber }: NavBarProps) {
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    router.push('/')
+    // Schools have their own dedicated login page; everyone else uses the
+    // organizer login. Root ("/") always redirects to the school login now,
+    // so route non-school roles straight to /login instead.
+    router.push(role === 'school' ? '/school/login' : '/login')
     router.refresh()
   }
 
