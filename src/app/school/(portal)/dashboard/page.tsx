@@ -8,10 +8,10 @@ import type { Announcement } from '@/lib/types'
 export default async function SchoolDashboard() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  if (!user) redirect('/school/login')
 
   const slotNumber = user.user_metadata?.slot_number as number | undefined
-  if (!slotNumber) redirect('/login')
+  if (!slotNumber) redirect('/school/login')
 
   const [
     { data: announcements },

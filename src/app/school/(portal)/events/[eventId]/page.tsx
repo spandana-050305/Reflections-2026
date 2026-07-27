@@ -37,10 +37,10 @@ export default function EventDetailPage() {
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      if (!user) { router.push('/school/login'); return }
 
       const slot = user.user_metadata?.slot_number as number
-      if (!slot) { router.push('/login'); return }   // guard: no slot assigned yet
+      if (!slot) { router.push('/school/login'); return }   // guard: no slot assigned yet
       setSlotNumber(slot)
 
       const [

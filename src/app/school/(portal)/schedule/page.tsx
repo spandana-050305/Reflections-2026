@@ -5,7 +5,7 @@ import { Calendar, MapPin } from 'lucide-react'
 export default async function SchoolSchedulePage() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  if (!user) redirect('/school/login')
 
   const { data: events } = await supabase
     .from('events')

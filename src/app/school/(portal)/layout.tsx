@@ -7,8 +7,8 @@ import NavLink from '@/components/layout/NavLink'
 export default async function SchoolLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-  if (user.user_metadata?.role !== 'school') redirect('/login')
+  if (!user) redirect('/school/login')
+  if (user.user_metadata?.role !== 'school') redirect('/school/login')
 
   const slotNumber = user.user_metadata?.slot_number as number | undefined
 
