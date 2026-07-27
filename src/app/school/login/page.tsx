@@ -112,42 +112,6 @@ export default function SchoolLoginPage() {
         </div>
       </div>
 
-      {/* ── School Sign In ── */}
-      <div className="relative w-full max-w-md mx-auto px-4 pb-4">
-        <div className="rounded-2xl border border-brand-200 bg-white shadow-lg shadow-brand-200/50 overflow-hidden">
-          <div className="h-1 w-full bg-gradient-to-r from-brand-500 via-brand-600 to-brand-700" />
-          <div className="p-8">
-            <h2 className="text-lg font-semibold text-slate-800 mb-1 flex items-center gap-2">
-              <School size={18} className="text-brand-600" /> School Sign In
-            </h2>
-            <p className="text-sm text-slate-500 mb-6">Sign in with the login ID and password given to your school.</p>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Login ID</label>
-                <div className="relative">
-                  <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input type="text" value={email} onChange={e => setEmail(e.target.value)} className="input pl-10" placeholder="your school's login ID" required autoFocus />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
-                <div className="relative">
-                  <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} className="input pl-10 pr-10" placeholder="••••••••" required />
-                  <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors" tabIndex={-1}>
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-              {error && <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl border border-red-100">{error}</div>}
-              <button type="submit" className="btn-primary w-full mt-2 py-3" disabled={loading}>
-                {loading ? 'Signing in…' : <span className="flex items-center justify-center gap-2">Sign In <ArrowRight size={16} /></span>}
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-
       {/* ── About ── */}
       <div className="max-w-3xl mx-auto px-6 py-10 text-center">
         <h2 className="text-2xl sm:text-3xl font-bold text-slate-800">Where Young Talent Takes Center Stage</h2>
@@ -201,6 +165,42 @@ export default function SchoolLoginPage() {
         </div>
 
         <PhotoGallery />
+      </div>
+
+      {/* ── School Sign In ── */}
+      <div className="relative w-full max-w-md mx-auto px-4 py-12">
+        <div className="rounded-2xl border border-brand-200 bg-white shadow-lg shadow-brand-200/50 overflow-hidden">
+          <div className="h-1 w-full bg-gradient-to-r from-brand-500 via-brand-600 to-brand-700" />
+          <div className="p-8">
+            <h2 className="text-lg font-semibold text-slate-800 mb-1 flex items-center gap-2">
+              <School size={18} className="text-brand-600" /> School Sign In
+            </h2>
+            <p className="text-sm text-slate-500 mb-6">Sign in with the login ID and password given to your school.</p>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Login ID</label>
+                <div className="relative">
+                  <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input type="text" value={email} onChange={e => setEmail(e.target.value)} className="input pl-10" placeholder="your school's login ID" required autoFocus />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+                <div className="relative">
+                  <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} className="input pl-10 pr-10" placeholder="••••••••" required />
+                  <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors" tabIndex={-1}>
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+              {error && <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl border border-red-100">{error}</div>}
+              <button type="submit" className="btn-primary w-full mt-2 py-3" disabled={loading}>
+                {loading ? 'Signing in…' : <span className="flex items-center justify-center gap-2">Sign In <ArrowRight size={16} /></span>}
+              </button>
+            </form>
+          </div>
+        </div>
       </div>
 
     </div>
