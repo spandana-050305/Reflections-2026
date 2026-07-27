@@ -1,10 +1,35 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import { Mail, Lock, ArrowRight, Eye, EyeOff, School } from 'lucide-react'
 import Image from 'next/image'
+import PhotoGallery from '@/components/PhotoGallery'
+
+const stats = [
+  { value: '10+', label: 'Years of Legacy' },
+  { value: '60+', label: 'Competitions' },
+  { value: '60+', label: 'Participating Schools' },
+  { value: '1000+', label: 'Student Participants' },
+  { value: '2', label: 'Days of Celebration' },
+]
+
+const whyParticipate = [
+  { emoji: '🎭', text: 'Showcase your talents on a bigger stage.' },
+  { emoji: '🏆', text: 'Compete with students from multiple schools.' },
+  { emoji: '🎨', text: 'Explore cultural, literary, and creative competitions.' },
+  { emoji: '🤝', text: 'Build friendships and unforgettable experiences.' },
+  { emoji: '🌟', text: 'Win exciting prizes, certificates, and recognition.' },
+]
+
+const highlights = [
+  'Multiple Cultural & Academic Competitions',
+  'School Team Championships',
+  'Stage Performances',
+  'Creative Arts & Literary Events',
+  'Certificates for Participants',
+  'Exciting Prizes & Overall Championship Trophy',
+]
 
 export default function SchoolLoginPage() {
   const supabase = createClient()
@@ -47,42 +72,50 @@ export default function SchoolLoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden bg-white">
-      {/* Animated pink gradient blobs */}
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-brand-300/40 blur-3xl animate-float-slow" />
-        <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-brand-200/60 blur-3xl animate-float" />
-        <div className="absolute top-1/2 left-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-100/40 blur-3xl animate-pulse-glow" />
-      </div>
-      {/* Subtle dot texture */}
-      <div className="pointer-events-none absolute inset-0 dot-grid opacity-40" />
+    <div className="min-h-screen bg-white flex flex-col overflow-hidden">
 
-      <div className="relative w-full max-w-md animate-fade-in-up">
-        {/* Logo + title */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <div className="relative">
-              <div className="absolute inset-0 rounded-3xl bg-brand-300/40 blur-xl animate-pulse-glow" />
-              <div className="relative flex items-center justify-center h-20 w-20 rounded-3xl bg-white shadow-glow ring-1 ring-brand-100">
-                <Image
-                  src="/logo.png"
-                  alt="Rotaract Club MCE"
-                  width={56}
-                  height={56}
-                  className="object-contain"
-                />
-              </div>
-            </div>
+      {/* ── Hero ── */}
+      <div className="relative flex flex-col items-center justify-center pt-16 pb-12 px-4 text-center overflow-hidden">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -top-32 -right-32 h-[500px] w-[500px] rounded-full bg-brand-300/30 blur-3xl" />
+          <div className="absolute -bottom-32 -left-32 h-[500px] w-[500px] rounded-full bg-brand-200/40 blur-3xl" />
+          <div className="absolute top-1/2 left-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-100/30 blur-3xl" />
+        </div>
+        <div className="pointer-events-none absolute inset-0 dot-grid opacity-30" />
+
+        {/* Logo */}
+        <div className="relative mb-6 animate-fade-in-up">
+          <div className="absolute inset-0 rounded-3xl bg-brand-300/40 blur-xl animate-pulse-glow" />
+          <div className="relative flex items-center justify-center h-24 w-24 rounded-3xl bg-white shadow-glow ring-1 ring-brand-100">
+            <Image src="/logo.png" alt="Rotaract Club MCE" width={64} height={64} className="object-contain" />
           </div>
-          <h1 className="text-4xl font-bold tracking-tight text-gradient">Reflections</h1>
-          <p className="text-slate-500 mt-1.5 text-sm">Rotaract Club MCE · School Portal</p>
         </div>
 
-        {/* Login Card */}
-        <div className="rounded-2xl border border-brand-200 bg-white shadow-lg shadow-brand-200/50 overflow-hidden">
-          {/* Rotaract accent stripe at top */}
-          <div className="h-1 w-full bg-gradient-to-r from-brand-500 via-brand-600 to-brand-700" />
+        <h1 className="text-5xl sm:text-7xl tracking-tight text-gradient animate-fade-in-up" style={{ fontFamily: 'var(--font-lilita)', animationDelay: '0.1s' }}>
+          Reflections
+        </h1>
+        <p className="text-base sm:text-lg font-medium text-slate-600 mt-3 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+          Rotaract Club of MCE, Hassan
+        </p>
+        <p className="text-sm sm:text-base text-slate-400 mt-1.5 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
+          Celebrating Talent. Inspiring Excellence. Building Memories.
+        </p>
 
+        {/* Stats */}
+        <div className="flex flex-wrap justify-center gap-6 sm:gap-10 mt-10 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+          {stats.map(s => (
+            <div key={s.label} className="text-center">
+              <p className="text-2xl sm:text-3xl font-bold text-brand-600">{s.value}</p>
+              <p className="text-xs text-slate-400 mt-0.5 max-w-[80px]">{s.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── School Sign In ── */}
+      <div className="relative w-full max-w-md mx-auto px-4 pb-4">
+        <div className="rounded-2xl border border-brand-200 bg-white shadow-lg shadow-brand-200/50 overflow-hidden">
+          <div className="h-1 w-full bg-gradient-to-r from-brand-500 via-brand-600 to-brand-700" />
           <div className="p-8">
             <h2 className="text-lg font-semibold text-slate-800 mb-1 flex items-center gap-2">
               <School size={18} className="text-brand-600" /> School Sign In
@@ -113,11 +146,63 @@ export default function SchoolLoginPage() {
             </form>
           </div>
         </div>
+      </div>
 
-        <p className="text-center text-xs text-slate-400 mt-4">
-          <Link href="/about" className="hover:text-brand-600 hover:underline">About Reflections</Link>
+      {/* ── About ── */}
+      <div className="max-w-3xl mx-auto px-6 py-10 text-center">
+        <h2 className="text-2xl sm:text-3xl font-bold text-slate-800">Where Young Talent Takes Center Stage</h2>
+        <p className="text-slate-500 mt-4 leading-relaxed text-sm sm:text-base">
+          Reflections is the flagship annual inter-school event organized by the Rotaract Club of MCE, Hassan.
+          For over a decade, it has brought together students from schools across the Hassan to compete, perform,
+          create, and grow through a diverse range of cultural, literary, artistic, and academic events.
+        </p>
+        <p className="text-slate-500 mt-3 leading-relaxed text-sm sm:text-base">
+          More than a competition, Reflections is a platform that nurtures confidence, creativity, teamwork, and
+          lifelong memories while celebrating the incredible potential of young minds.
         </p>
       </div>
+
+      {/* ── Why Participate + Event Highlights ── */}
+      <div className="max-w-4xl mx-auto px-6 pb-10 grid sm:grid-cols-2 gap-6">
+        {/* Why Participate */}
+        <div className="card">
+          <h3 className="text-lg font-bold text-slate-800 mb-4">Why Participate?</h3>
+          <ul className="space-y-3">
+            {whyParticipate.map((item, i) => (
+              <li key={i} className="flex items-start gap-3 text-sm text-slate-600">
+                <span className="text-lg leading-none mt-0.5">{item.emoji}</span>
+                <span>{item.text}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Event Highlights */}
+        <div className="card">
+          <h3 className="text-lg font-bold text-slate-800 mb-4">Event Highlights</h3>
+          <ul className="space-y-2.5">
+            {highlights.map((h, i) => (
+              <li key={i} className="flex items-center gap-2.5 text-sm text-slate-600">
+                <span className="h-1.5 w-1.5 rounded-full bg-brand-500 shrink-0" />
+                {h}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      {/* ── Gallery ── */}
+      <div className="py-10 bg-gray-50/60">
+        <div className="text-center mb-8 px-4">
+          <h2 className="text-2xl sm:text-3xl font-bold text-slate-800">Moments That Define Reflections</h2>
+          <p className="text-slate-400 text-sm mt-2 max-w-xl mx-auto">
+            A glimpse into the energy, excitement, creativity, and unforgettable memories created every year.
+          </p>
+        </div>
+
+        <PhotoGallery />
+      </div>
+
     </div>
   )
 }
