@@ -101,24 +101,15 @@ export default function SchoolLoginPage() {
           Celebrating Talent. Inspiring Excellence. Building Memories.
         </p>
 
-        {/* Quick sign in */}
-        <form onSubmit={handleLogin} className="relative w-full max-w-sm mt-8 animate-fade-in-up space-y-2.5" style={{ animationDelay: '0.28s' }}>
-          <div className="relative">
-            <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input type="text" value={email} onChange={e => setEmail(e.target.value)} className="input pl-9 py-2.5 text-sm w-full" placeholder="Login ID" required autoFocus />
-          </div>
-          <div className="relative">
-            <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} className="input pl-9 pr-9 py-2.5 text-sm w-full" placeholder="Password" required />
-            <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors" tabIndex={-1}>
-              {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-            </button>
-          </div>
-          <button type="submit" className="btn-primary w-full flex items-center justify-center gap-1.5 py-2.5 text-sm" disabled={loading}>
-            {loading ? 'Signing in…' : <>Sign In <ArrowRight size={14} /></>}
-          </button>
-          {error && <div className="bg-red-50 text-red-600 text-xs px-3 py-2 rounded-xl border border-red-100 text-left">{error}</div>}
-        </form>
+        {/* Quick sign in — jumps down to the full sign-in form */}
+        <button
+          type="button"
+          onClick={() => document.getElementById('school-sign-in')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+          className="btn-primary w-full max-w-sm mt-8 flex items-center justify-center gap-1.5 py-2.5 text-sm animate-fade-in-up"
+          style={{ animationDelay: '0.28s' }}
+        >
+          Sign In <ArrowRight size={14} />
+        </button>
 
         {/* Stats */}
         <div className="flex flex-wrap justify-center gap-6 sm:gap-10 mt-10 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
@@ -187,7 +178,7 @@ export default function SchoolLoginPage() {
       </div>
 
       {/* ── School Sign In ── */}
-      <div className="relative w-full max-w-md mx-auto px-4 py-12">
+      <div id="school-sign-in" className="relative w-full max-w-md mx-auto px-4 py-12 scroll-mt-6">
         <div className="rounded-2xl border border-brand-200 bg-white shadow-lg shadow-brand-200/50 overflow-hidden">
           <div className="h-1 w-full bg-gradient-to-r from-brand-500 via-brand-600 to-brand-700" />
           <div className="p-8">
