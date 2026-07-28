@@ -236,13 +236,22 @@ export default function GuestEvaluatePage() {
   // like setScore, then (re)schedules a debounced auto-save for that row so
   // marks are saved a couple seconds after the judge stops adjusting them —
   // not just when they click Submit or Finish.
+  //
+  // Important: the setTimeout callback below is created in *this* render's
+  // closure but doesn't run for 1200ms, by which point React has re-rendered
+  // many times — a plain `scores[key]` read inside it would see this render's
+  // (stale, pre-edit) value, not the edit that just happened. So we compute
+  // the updated row here, where we know it's correct, and pass it straight
+  // through to submitRow instead of letting it re-read state later.
   function scoreChangedInReal(r: EntryRow, idx: number, value: number) {
     const key = rowKey(r.slot_number, r.entry_index)
+    const updated = [...(scores[key] ?? emptyScores())]
+    updated[idx] = value
     setScore(key, idx, value)
     clearAutoSaveTimer(key)
     autoSaveTimers.current[key] = setTimeout(() => {
       delete autoSaveTimers.current[key]
-      submitRow(r)
+      submitRow(r, updated)
     }, 1200)
   }
 
@@ -261,14 +270,17 @@ export default function GuestEvaluatePage() {
     }
   }
 
-  async function submitRow(r: EntryRow): Promise<boolean> {
+  async function submitRow(r: EntryRow, overrideScores?: number[]): Promise<boolean> {
     if (!event || !judgeNumber) return false
     const key = rowKey(r.slot_number, r.entry_index)
     clearAutoSaveTimer(key) // an explicit/bulk save supersedes any pending debounce
     setSavingRow(key)
     setSubmitError('')
 
-    const criteriaScores = scores[key] ?? emptyScores()
+    // overrideScores is passed by the debounced auto-save, which computes the
+    // up-to-date row itself rather than risk reading stale state (see
+    // scoreChangedInReal). Manual/bulk submits fall back to current state.
+    const criteriaScores = overrideScores ?? scores[key] ?? emptyScores()
     const judgeTotal = criteriaScores.reduce((a, b) => a + (Number(b) || 0), 0)
 
     try {
