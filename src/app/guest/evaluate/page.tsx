@@ -658,7 +658,7 @@ export default function GuestEvaluatePage() {
                       </td>
                       {rowScores.map((val, i) => (
                         <td key={i} className="px-2 py-1.5 border border-gray-100">
-                          <MarkSelect value={val} onChange={n => setScore(key, i, n)} disabled={isSubmitted} />
+                          <MarkSelect value={val} onChange={n => setScore(key, i, n)} disabled={isSubmitted || finishing} />
                         </td>
                       ))}
                       <td className="px-3 py-2 border border-gray-100 text-center font-semibold text-gray-700">
@@ -672,7 +672,7 @@ export default function GuestEvaluatePage() {
                         ) : (
                           <button
                             onClick={() => submitRow(r)}
-                            disabled={!!isSaving}
+                            disabled={!!isSaving || finishing}
                             className="btn-primary text-xs px-3 py-1"
                           >
                             {isSaving ? 'Saving…' : 'Submit'}
