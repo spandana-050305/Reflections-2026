@@ -15,6 +15,9 @@ const ACTION_LABELS: Record<string, string> = {
   unsuspend_user: 'Unsuspended user',
   force_logout: 'Force logged out',
   delete_user: 'Deleted user',
+  compute_result: 'Computed winners',
+  publish_result: 'Published result',
+  unpublish_result: 'Unpublished result',
 }
 
 const ACTION_COLORS: Record<string, string> = {
@@ -28,6 +31,9 @@ const ACTION_COLORS: Record<string, string> = {
   unsuspend_user: 'bg-green-100 text-green-700',
   force_logout: 'bg-orange-100 text-orange-700',
   delete_user: 'bg-red-100 text-red-700',
+  compute_result: 'bg-blue-100 text-blue-700',
+  publish_result: 'bg-green-100 text-green-700',
+  unpublish_result: 'bg-orange-100 text-orange-700',
 }
 
 export default function ActivityLogPage() {

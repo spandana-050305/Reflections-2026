@@ -239,6 +239,11 @@ ALTER TABLE marks ADD  CONSTRAINT marks_slot_event_entry_key UNIQUE (slot_number
 -- ── RESULTS: full tie-aware winner groups ────────────────────
 ALTER TABLE results ADD COLUMN IF NOT EXISTS winners_json TEXT;            -- JSON array of {rank,total,entries[]}
 
+-- ── RESULTS: audit trail for compute-winners ──────────────────
+-- Shown on the admin Results page next to each computed result.
+ALTER TABLE results ADD COLUMN IF NOT EXISTS computed_by_email TEXT;
+ALTER TABLE results ADD COLUMN IF NOT EXISTS computed_at       TIMESTAMPTZ;
+
 -- ── SETTINGS: configurable place points ──────────────────────
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS points_1st INTEGER NOT NULL DEFAULT 15;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS points_2nd INTEGER NOT NULL DEFAULT 10;

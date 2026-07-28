@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { logActivity } from '@/lib/activity-log'
 
 function adminClient() {
   return createClient(
@@ -22,6 +23,17 @@ async function getCallerRole(): Promise<string | null> {
   return user?.user_metadata?.role ?? null
 }
 
+async function getCallerUser() {
+  const cookieStore = cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (n: string) => cookieStore.get(n)?.value, set() {}, remove() {} } }
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
+}
+
 // Upsert a result row for an event
 export async function POST(request: Request) {
   const role = await getCallerRole()
@@ -35,12 +47,30 @@ export async function POST(request: Request) {
   }
 
   const admin = adminClient()
+  const caller = await getCallerUser()
+
   const { error } = await admin.from('results').upsert(
-    { event_id: eventId, winners_json: winnersJson, published: false },
+    {
+      event_id: eventId,
+      winners_json: winnersJson,
+      published: false,
+      computed_by_email: caller?.email ?? null,
+      computed_at: new Date().toISOString(),
+    },
     { onConflict: 'event_id' }
   )
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  const { data: ev } = await admin.from('events').select('name').eq('id', eventId).maybeSingle()
+  await logActivity({
+    action: 'compute_result',
+    actorEmail: caller?.email,
+    actorRole: role,
+    targetId: eventId,
+    details: ev?.name ?? eventId,
+  })
+
   return NextResponse.json({ ok: true })
 }
 

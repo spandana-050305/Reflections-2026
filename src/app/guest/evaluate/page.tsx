@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import {
   ArrowLeft, FileText, MapPin, Users, ClipboardList, Lock,
@@ -46,6 +46,42 @@ export default function GuestEvaluatePage() {
   const [search, setSearch] = useState('')
   const [showFinishConfirm, setShowFinishConfirm] = useState(false)
   const [finishing, setFinishing] = useState(false)
+
+  // Per-row debounce timers for auto-save (real evaluation only — never trials).
+  const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+
+  function clearAutoSaveTimer(key: string) {
+    if (autoSaveTimers.current[key]) {
+      clearTimeout(autoSaveTimers.current[key])
+      delete autoSaveTimers.current[key]
+    }
+  }
+
+  function clearAllAutoSaveTimers() {
+    Object.keys(autoSaveTimers.current).forEach(clearAutoSaveTimer)
+  }
+
+  // Clear any pending auto-save timers on unmount so a stale save can't
+  // fire after the judge has navigated away.
+  useEffect(() => () => clearAllAutoSaveTimers(), [])
+
+  // Warn before closing/reloading the tab if there are scores entered that
+  // haven't been saved yet (auto-save normally catches these within ~1.2s,
+  // but this covers the gap, a failed save, or a very fast exit).
+  useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      const hasUnsaved = rows.some(r => {
+        const key = rowKey(r.slot_number, r.entry_index)
+        return touchedRows.has(key) && !submittedRows.has(key)
+      })
+      if (hasUnsaved) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [rows, touchedRows, submittedRows])
 
   useEffect(() => { loadCategoriesAndEvents() }, [])
 
@@ -196,8 +232,23 @@ export default function GuestEvaluatePage() {
     setTouchedRows(prev => prev.has(key) ? prev : new Set(prev).add(key))
   }
 
+  // Used only during the real evaluation (never trials). Updates the score
+  // like setScore, then (re)schedules a debounced auto-save for that row so
+  // marks are saved a couple seconds after the judge stops adjusting them —
+  // not just when they click Submit or Finish.
+  function scoreChangedInReal(r: EntryRow, idx: number, value: number) {
+    const key = rowKey(r.slot_number, r.entry_index)
+    setScore(key, idx, value)
+    clearAutoSaveTimer(key)
+    autoSaveTimers.current[key] = setTimeout(() => {
+      delete autoSaveTimers.current[key]
+      submitRow(r)
+    }, 1200)
+  }
+
   function handleTrialNext() {
     // Each trial round is a single-student practice — no cycling through everyone.
+    clearAllAutoSaveTimers()
     const reset: Record<string, number[]> = {}
     rows.forEach(r => { reset[rowKey(r.slot_number, r.entry_index)] = emptyScores() })
     setScores(reset)
@@ -213,6 +264,7 @@ export default function GuestEvaluatePage() {
   async function submitRow(r: EntryRow): Promise<boolean> {
     if (!event || !judgeNumber) return false
     const key = rowKey(r.slot_number, r.entry_index)
+    clearAutoSaveTimer(key) // an explicit/bulk save supersedes any pending debounce
     setSavingRow(key)
     setSubmitError('')
 
@@ -272,12 +324,14 @@ export default function GuestEvaluatePage() {
   }
 
   async function handleFinishClick() {
+    clearAllAutoSaveTimers()
     const ok = await submitTouchedButUnsavedRows()
     if (!ok) return // submitError is already set; keep the judge on this screen to retry
     setShowFinishConfirm(true)
   }
 
   function backToStart() {
+    clearAllAutoSaveTimers()
     setStep('category')
     setCategoryId(null)
     setEvent(null)
@@ -298,6 +352,7 @@ export default function GuestEvaluatePage() {
 
   // Keep the same event, but evaluate it as a different judge.
   function pickDifferentJudge() {
+    clearAllAutoSaveTimers()
     setJudgeName('')
     setJudgeNumber('')
     setSubmittedRows(new Set())
@@ -572,7 +627,7 @@ export default function GuestEvaluatePage() {
           )}
         </div>
         <button
-          onClick={() => { setSubmittedRows(new Set()); setTouchedRows(new Set()); setStep('real') }}
+          onClick={() => { clearAllAutoSaveTimers(); setSubmittedRows(new Set()); setTouchedRows(new Set()); setStep('real') }}
           className="btn-primary w-full text-base py-3"
         >
           Start Evaluation
@@ -658,7 +713,7 @@ export default function GuestEvaluatePage() {
                       </td>
                       {rowScores.map((val, i) => (
                         <td key={i} className="px-2 py-1.5 border border-gray-100">
-                          <MarkSelect value={val} onChange={n => setScore(key, i, n)} disabled={isSubmitted || finishing} />
+                          <MarkSelect value={val} onChange={n => scoreChangedInReal(r, i, n)} disabled={isSubmitted || finishing} />
                         </td>
                       ))}
                       <td className="px-3 py-2 border border-gray-100 text-center font-semibold text-gray-700">
