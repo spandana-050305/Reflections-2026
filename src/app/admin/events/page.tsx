@@ -276,7 +276,7 @@ export default function AdminEventsPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Time</label>
-              <input type="text" className="input" value={form.event_time} onChange={e => setForm({ ...form, event_time: e.target.value })} placeholder="e.g. 9:00 AM" />
+              <input type="time" className="input" value={form.event_time} onChange={e => setForm({ ...form, event_time: e.target.value })} />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Venue</label>

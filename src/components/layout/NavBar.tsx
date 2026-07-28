@@ -28,6 +28,7 @@ export default function NavBar({ title, role, slotNumber }: NavBarProps) {
     school: slotNumber != null ? `School · Slot ${slotNumber}` : 'School · Slot not assigned',
     club_member: 'Club Member',
     final_year: 'Final Year',
+    super_admin: 'Super Admin',
     guest: 'Guest Evaluator',
   }
 

@@ -19,7 +19,7 @@ export default async function SuperAdminLayout({ children }: { children: React.R
 
   return (
     <div className="min-h-screen flex flex-col">
-      <NavBar title="Super Admin" role="final_year" />
+      <NavBar title="Super Admin" role="super_admin" />
       <div className="flex flex-1">
         <aside className="w-60 bg-white/50 backdrop-blur-xl border-r border-white/60 hidden md:flex flex-col">
           <div className="px-4 pt-4 pb-2">

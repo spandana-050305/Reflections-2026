@@ -9,6 +9,13 @@ export default async function AdminDashboard() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const portalLabel: Record<string, string> = {
+    final_year: 'Final Year Portal',
+    club_member: 'Club Member Portal',
+    super_admin: 'Super Admin Portal',
+  }
+  const roleLabel = portalLabel[user.user_metadata?.role] ?? 'Admin Portal'
+
   const [
     { data: schools },
     { data: events },
@@ -42,7 +49,7 @@ export default async function AdminDashboard() {
         <div className="relative flex items-center justify-between gap-4">
           <div>
             <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/80 mb-2">
-              <Sparkles size={13} /> Final Year Portal
+              <Sparkles size={13} /> {roleLabel}
             </p>
             <h2 className="text-2xl sm:text-3xl font-bold">Welcome back 👋</h2>
             <p className="text-white/85 mt-1.5 text-sm">Manage events, marks and results from one place.</p>
