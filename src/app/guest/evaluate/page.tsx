@@ -40,10 +40,12 @@ export default function GuestEvaluatePage() {
   const [scores, setScores] = useState<Record<string, number[]>>({})
 
   const [submittedRows, setSubmittedRows] = useState<Set<string>>(new Set())
+  const [touchedRows, setTouchedRows] = useState<Set<string>>(new Set())
   const [savingRow, setSavingRow] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState('')
   const [search, setSearch] = useState('')
   const [showFinishConfirm, setShowFinishConfirm] = useState(false)
+  const [finishing, setFinishing] = useState(false)
 
   useEffect(() => { loadCategoriesAndEvents() }, [])
 
@@ -165,6 +167,7 @@ export default function GuestEvaluatePage() {
     })
     setScores(reset)
     setSubmittedRows(submitted)
+    setTouchedRows(new Set(submitted))
 
     if (existingMarks.length > 0) {
       // Already finished every row → fully locked for this judge.
@@ -190,6 +193,7 @@ export default function GuestEvaluatePage() {
       next[idx] = value
       return { ...prev, [key]: next }
     })
+    setTouchedRows(prev => prev.has(key) ? prev : new Set(prev).add(key))
   }
 
   function handleTrialNext() {
@@ -197,6 +201,7 @@ export default function GuestEvaluatePage() {
     const reset: Record<string, number[]> = {}
     rows.forEach(r => { reset[rowKey(r.slot_number, r.entry_index)] = emptyScores() })
     setScores(reset)
+    setTouchedRows(new Set())
     setTrialSubmitted(false)
     if (trialNum < NUM_TRIALS) {
       setTrialNum(n => n + 1)
@@ -205,8 +210,8 @@ export default function GuestEvaluatePage() {
     }
   }
 
-  async function submitRow(r: EntryRow) {
-    if (!event || !judgeNumber) return
+  async function submitRow(r: EntryRow): Promise<boolean> {
+    if (!event || !judgeNumber) return false
     const key = rowKey(r.slot_number, r.entry_index)
     setSavingRow(key)
     setSubmitError('')
@@ -214,31 +219,62 @@ export default function GuestEvaluatePage() {
     const criteriaScores = scores[key] ?? emptyScores()
     const judgeTotal = criteriaScores.reduce((a, b) => a + (Number(b) || 0), 0)
 
-    const res = await fetch('/api/guest/submit-mark', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        eventId: event.id,
-        judgeNumber,
-        judgeName: judgeName.trim(),
-        slotNumber: r.slot_number,
-        entryIndex: r.entry_index,
-        criteriaScores,
-        judgeTotal,
-      }),
-    })
+    try {
+      const res = await fetch('/api/guest/submit-mark', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: event.id,
+          judgeNumber,
+          judgeName: judgeName.trim(),
+          slotNumber: r.slot_number,
+          entryIndex: r.entry_index,
+          criteriaScores,
+          judgeTotal,
+        }),
+      })
 
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}))
-      setSubmitError('Error saving marks: ' + (j.error ?? 'Unknown error'))
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        setSubmitError('Error saving marks: ' + (j.error ?? 'Unknown error'))
+        setSavingRow(null)
+        return false
+      }
+
+      setSubmittedRows(prev => new Set(prev).add(key))
       setSavingRow(null)
-      return
+      return true
+    } catch (err: any) {
+      setSubmitError(`Network error saving marks: ${err?.message ?? String(err)}`)
+      setSavingRow(null)
+      return false
     }
+  }
 
-    const newSubmitted = new Set(submittedRows)
-    newSubmitted.add(key)
-    setSubmittedRows(newSubmitted)
-    setSavingRow(null)
+  // Rows the judge entered a score for but never individually clicked
+  // "Submit" on. Called when finishing, so filling in scores and hitting
+  // "Finish Evaluating Event" reliably saves them — no separate click needed.
+  async function submitTouchedButUnsavedRows(): Promise<boolean> {
+    const pending = rows.filter(r => {
+      const key = rowKey(r.slot_number, r.entry_index)
+      return touchedRows.has(key) && !submittedRows.has(key)
+    })
+    if (pending.length === 0) return true
+
+    setFinishing(true)
+    let allOk = true
+    for (const r of pending) {
+      const ok = await submitRow(r)
+      if (!ok) allOk = false
+    }
+    setFinishing(false)
+    return allOk
+  }
+
+  async function handleFinishClick() {
+    const ok = await submitTouchedButUnsavedRows()
+    if (!ok) return // submitError is already set; keep the judge on this screen to retry
+    setShowFinishConfirm(true)
   }
 
   function backToStart() {
@@ -253,6 +289,7 @@ export default function GuestEvaluatePage() {
     setTrialNum(1)
     setTrialSubmitted(false)
     setSubmittedRows(new Set())
+    setTouchedRows(new Set())
     setSavingRow(null)
     setSubmitError('')
     setSearch('')
@@ -264,6 +301,7 @@ export default function GuestEvaluatePage() {
     setJudgeName('')
     setJudgeNumber('')
     setSubmittedRows(new Set())
+    setTouchedRows(new Set())
     setSavingRow(null)
     setSubmitError('')
     setSearch('')
@@ -534,7 +572,7 @@ export default function GuestEvaluatePage() {
           )}
         </div>
         <button
-          onClick={() => { setSubmittedRows(new Set()); setStep('real') }}
+          onClick={() => { setSubmittedRows(new Set()); setTouchedRows(new Set()); setStep('real') }}
           className="btn-primary w-full text-base py-3"
         >
           Start Evaluation
@@ -661,12 +699,12 @@ export default function GuestEvaluatePage() {
 
         {rows.length > 0 && (
           <div className="flex flex-col sm:flex-row gap-3 pt-1">
-            <button onClick={() => setShowFinishConfirm(true)} className="btn-primary flex items-center gap-2">
-              <CheckCircle2 size={15} /> Finish Evaluating Event
+            <button onClick={handleFinishClick} disabled={finishing} className="btn-primary flex items-center gap-2">
+              <CheckCircle2 size={15} /> {finishing ? 'Saving your scores…' : 'Finish Evaluating Event'}
             </button>
             {!allDone && (
               <p className="text-xs text-amber-600 sm:self-center">
-                {rows.length - submittedRows.size} row(s) not yet submitted — you can finish now and resume later as this judge.
+                {rows.length - submittedRows.size} row(s) not yet scored — you can finish now and resume later as this judge.
               </p>
             )}
           </div>
@@ -695,13 +733,18 @@ export default function GuestEvaluatePage() {
   // ── Step: done ──
   if (step === 'done' && event) {
     const allDone = rows.length > 0 && submittedRows.size >= rows.length
+    const nothingSaved = submittedRows.size === 0
     return (
       <div className="max-w-md mx-auto space-y-5 text-center py-14">
         <CheckCircle2 size={40} className="mx-auto text-green-600" />
-        <h2 className="text-2xl font-bold text-gray-900">{allDone ? 'Thank you for evaluating!' : 'Progress saved'}</h2>
+        <h2 className="text-2xl font-bold text-gray-900">
+          {allDone ? 'Thank you for evaluating!' : nothingSaved ? 'No marks were saved' : 'Progress saved'}
+        </h2>
         <p className="text-gray-500 text-sm">
           {allDone
             ? `All marks for "${event.name}" as Judge ${judgeNumber} have been submitted and locked.`
+            : nothingSaved
+            ? `No scores were entered for "${event.name}" as Judge ${judgeNumber}, so nothing was saved. Re-select Judge ${judgeNumber} any time to enter marks.`
             : `${submittedRows.size} of ${rows.length} rows saved for "${event.name}" as Judge ${judgeNumber}. Re-select Judge ${judgeNumber} any time to finish the rest.`}
         </p>
         <p className="text-sm font-medium text-gray-700">Please continue as a different judge.</p>
