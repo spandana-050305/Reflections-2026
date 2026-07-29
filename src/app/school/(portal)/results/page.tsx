@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import { Trophy } from 'lucide-react'
+import { getSlotNumber } from '@/lib/auth-role'
 
 interface WinnerEntry { slot: number; entry: number; names: string }
 interface WinnerGroup { rank: number; total: number; entries: WinnerEntry[] }
@@ -29,7 +30,7 @@ export default async function SchoolResultsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/school/login')
 
-  const slotNumber = (user.user_metadata?.slot_number as number | undefined) ?? 0
+  const slotNumber = getSlotNumber(user) ?? 0
 
   const { data: results } = await supabase
     .from('results')

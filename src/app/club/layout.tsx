@@ -4,12 +4,13 @@ import { redirect } from 'next/navigation'
 import { LayoutDashboard, Users, Calendar, Trophy, Clock, XCircle } from 'lucide-react'
 import NavBar from '@/components/layout/NavBar'
 import NavLink from '@/components/layout/NavLink'
+import { getRole } from '@/lib/auth-role'
 
 export default async function ClubLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-  if (user.user_metadata?.role !== 'club_member') redirect('/login')
+  if (getRole(user) !== 'club_member') redirect('/login')
 
   // Self-registered club members must be approved by the Super Admin.
   // Seeded / admin-created accounts have no club_accounts row → allowed through.

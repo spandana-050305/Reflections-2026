@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase-server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { getCallerRole } from '@/lib/server-auth'
 
 function adminClient() {
   return createSupabaseClient(
@@ -11,10 +11,8 @@ function adminClient() {
 
 export async function DELETE(request: Request) {
   // Auth check
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const role = user.user_metadata?.role as string | undefined
+  const role = await getCallerRole()
+  if (!role) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (role !== 'final_year' && role !== 'super_admin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }

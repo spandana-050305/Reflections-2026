@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { Megaphone, School as SchoolIcon, CheckCircle2, Sparkles } from 'lucide-react'
 import Blobs from '@/components/layout/Blobs'
 import type { Announcement, School } from '@/lib/types'
+import { getRole } from '@/lib/auth-role'
 
 export default async function AdminDashboard() {
   const supabase = createClient()
@@ -14,7 +15,7 @@ export default async function AdminDashboard() {
     club_member: 'Club Member Portal',
     super_admin: 'Super Admin Portal',
   }
-  const roleLabel = portalLabel[user.user_metadata?.role] ?? 'Admin Portal'
+  const roleLabel = portalLabel[getRole(user) ?? ''] ?? 'Admin Portal'
 
   const [
     { data: schools },

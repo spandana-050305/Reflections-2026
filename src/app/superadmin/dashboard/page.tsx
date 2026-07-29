@@ -2,12 +2,13 @@ import { createClient } from '@/lib/supabase-server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import { School, ListChecks, ClipboardCheck, Trophy, UserCheck, Users, ShieldCheck } from 'lucide-react'
+import { getRole } from '@/lib/auth-role'
 
 export default async function SuperAdminDashboard() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-  if (user.user_metadata?.role !== 'super_admin') redirect('/login')
+  if (getRole(user) !== 'super_admin') redirect('/login')
 
   // Service role reads — several of these tables (club_accounts, guest_marks,
   // unpublished results) are blocked or filtered by RLS for the anon client.

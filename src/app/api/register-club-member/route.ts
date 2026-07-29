@@ -52,6 +52,7 @@ export async function POST(req: Request) {
     password,
     email_confirm: true,
     user_metadata: { role },
+    app_metadata: { role },
   })
   if (authErr) {
     const msg = authErr.message.includes('already')

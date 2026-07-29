@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { getCallerRole } from '@/lib/server-auth'
+import { setUserRoleMetadata } from '@/lib/set-role-metadata'
 
 function adminClient() {
   return createClient(
@@ -9,23 +9,6 @@ function adminClient() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
-}
-
-async function getCallerRole(): Promise<string | null> {
-  const cookieStore = cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) { return cookieStore.get(name)?.value },
-        set() {},
-        remove() {},
-      },
-    }
-  )
-  const { data: { user } } = await supabase.auth.getUser()
-  return user?.user_metadata?.role ?? null
 }
 
 // POST body: { updates: [{ userId: string, slotNumber: number }] }
@@ -42,9 +25,7 @@ export async function POST(req: NextRequest) {
   const errors: string[] = []
 
   for (const { userId, slotNumber } of updates) {
-    const { error } = await admin.auth.admin.updateUserById(userId, {
-      user_metadata: { slot_number: slotNumber },
-    })
+    const { error } = await setUserRoleMetadata(admin, userId, { slot_number: slotNumber })
     if (error) errors.push(`${userId}: ${error.message}`)
   }
 

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { getCallerUser } from '@/lib/server-auth'
+import { getRole, getSlotNumber } from '@/lib/auth-role'
 
 function adminClient() {
   return createClient(
@@ -12,16 +12,10 @@ function adminClient() {
 }
 
 async function getCallerSchool(): Promise<{ role: string; slotNumber: number } | null> {
-  const cookieStore = cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get: (n: string) => cookieStore.get(n)?.value, set() {}, remove() {} } }
-  )
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCallerUser()
   if (!user) return null
-  const role = user.user_metadata?.role
-  const slotNumber = user.user_metadata?.slot_number
+  const role = getRole(user)
+  const slotNumber = getSlotNumber(user)
   if (role !== 'school' || !slotNumber) return null
   return { role, slotNumber }
 }

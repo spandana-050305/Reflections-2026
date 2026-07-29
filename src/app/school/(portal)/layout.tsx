@@ -3,14 +3,15 @@ import { redirect } from 'next/navigation'
 import { LayoutDashboard, ListChecks, Trophy, Calendar } from 'lucide-react'
 import NavBar from '@/components/layout/NavBar'
 import NavLink from '@/components/layout/NavLink'
+import { getRole, getSlotNumber } from '@/lib/auth-role'
 
 export default async function SchoolLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/school/login')
-  if (user.user_metadata?.role !== 'school') redirect('/school/login')
+  if (getRole(user) !== 'school') redirect('/school/login')
 
-  const slotNumber = user.user_metadata?.slot_number as number | undefined
+  const slotNumber = getSlotNumber(user)
 
   const navLinks = [
     { href: '/school/dashboard', label: 'Dashboard', icon: LayoutDashboard },

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { FileText, CheckCircle, Clock } from 'lucide-react'
 import type { Category, Event } from '@/lib/types'
+import { getSlotNumber } from '@/lib/auth-role'
 
 // Always re-fetch so "Filled / Pending" reflects the latest saved participants
 export const dynamic = 'force-dynamic'
@@ -12,7 +13,7 @@ export default async function SchoolEventsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/school/login')
 
-  const slotNumber = user.user_metadata?.slot_number as number | undefined
+  const slotNumber = getSlotNumber(user)
   if (!slotNumber) redirect('/school/login')
 
   const [

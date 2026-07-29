@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { getCallerRole } from '@/lib/server-auth'
 
 function adminClient() {
   return createClient(
@@ -9,17 +8,6 @@ function adminClient() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
-}
-
-async function getCallerRole(): Promise<string | null> {
-  const cookieStore = cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get: (n: string) => cookieStore.get(n)?.value, set() {}, remove() {} } }
-  )
-  const { data: { user } } = await supabase.auth.getUser()
-  return user?.user_metadata?.role ?? null
 }
 
 // PATCH: update participant name

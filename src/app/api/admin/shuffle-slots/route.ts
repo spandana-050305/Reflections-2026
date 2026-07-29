@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { createClient as createServerClient } from '@/lib/supabase-server'
 import { createClient } from '@supabase/supabase-js'
+import { getCallerRole } from '@/lib/server-auth'
+import { setUserRoleMetadata } from '@/lib/set-role-metadata'
 
 function adminClient() {
   return createClient(
@@ -11,10 +12,8 @@ function adminClient() {
 
 export async function POST(request: Request) {
   // Auth check
-  const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const role = user.user_metadata?.role as string | undefined
+  const role = await getCallerRole()
+  if (!role) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (role !== 'final_year' && role !== 'super_admin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
@@ -77,9 +76,7 @@ export async function POST(request: Request) {
 
   if (metaUpdates.length > 0) {
     for (const { userId, slotNumber } of metaUpdates) {
-      await admin.auth.admin.updateUserById(userId, {
-        user_metadata: { slot_number: slotNumber },
-      })
+      await setUserRoleMetadata(admin, userId, { slot_number: slotNumber })
     }
   }
 

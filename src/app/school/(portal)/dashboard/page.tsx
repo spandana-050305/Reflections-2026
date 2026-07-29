@@ -4,13 +4,14 @@ import Link from 'next/link'
 import { Megaphone, ListChecks, CheckCircle2, CalendarDays, Sparkles, Users } from 'lucide-react'
 import Blobs from '@/components/layout/Blobs'
 import type { Announcement } from '@/lib/types'
+import { getSlotNumber } from '@/lib/auth-role'
 
 export default async function SchoolDashboard() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/school/login')
 
-  const slotNumber = user.user_metadata?.slot_number as number | undefined
+  const slotNumber = getSlotNumber(user)
   if (!slotNumber) redirect('/school/login')
 
   const [

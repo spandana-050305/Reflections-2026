@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient as createServerClient } from '@/lib/supabase-server'
 import { createClient } from '@supabase/supabase-js'
+import { getCallerRole } from '@/lib/server-auth'
 
 function adminClient() {
   return createClient(
@@ -10,12 +10,9 @@ function adminClient() {
 }
 
 async function authCheck() {
-  const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-  const role = user.user_metadata?.role as string | undefined
+  const role = await getCallerRole()
   if (role !== 'final_year' && role !== 'super_admin' && role !== 'club_member') return null
-  return user
+  return role
 }
 
 export async function POST(request: Request) {

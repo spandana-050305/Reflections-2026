@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { getCallerRole } from '@/lib/server-auth'
 
 // Service-role client — bypasses RLS, can create pre-confirmed users
 function adminClient() {
@@ -10,24 +9,6 @@ function adminClient() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
-}
-
-// Verify the calling user is final_year before doing anything
-async function getCallerRole(): Promise<string | null> {
-  const cookieStore = cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) { return cookieStore.get(name)?.value },
-        set() {},
-        remove() {},
-      },
-    }
-  )
-  const { data: { user } } = await supabase.auth.getUser()
-  return user?.user_metadata?.role ?? null
 }
 
 // GET — list all guest credentials (service role; RLS-independent)
@@ -63,6 +44,7 @@ export async function POST(req: NextRequest) {
     password,
     email_confirm: true,          // pre-confirmed — no email needed
     user_metadata: { role: 'guest' },
+    app_metadata: { role: 'guest' },  // source of truth for RLS/security checks
   })
 
   if (authErr) {

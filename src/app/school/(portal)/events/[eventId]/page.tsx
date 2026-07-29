@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { FileText, ArrowLeft, Save } from 'lucide-react'
 import type { Event, Participant } from '@/lib/types'
+import { getSlotNumber } from '@/lib/auth-role'
 
 interface Entry {
   id?: string
@@ -39,7 +40,7 @@ export default function EventDetailPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/school/login'); return }
 
-      const slot = user.user_metadata?.slot_number as number
+      const slot = getSlotNumber(user)
       if (!slot) { router.push('/school/login'); return }   // guard: no slot assigned yet
       setSlotNumber(slot)
 

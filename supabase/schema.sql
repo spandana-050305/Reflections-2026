@@ -347,3 +347,66 @@ CREATE POLICY "admin_guest_marks" ON guest_marks
 -- onspot_registrations: club members + final years manage
 CREATE POLICY "club_onspot" ON onspot_registrations
   FOR ALL USING (get_user_role() IN ('club_member', 'final_year'));
+
+-- ============================================================
+-- SECURITY FIX (run this block on the live database — 26 Jul 2026)
+--
+-- 1. `announcements` had RLS policies defined above but RLS itself was
+--    somehow left disabled on the live table (confirmed via Supabase's
+--    security linter), making it fully public: anyone with the project
+--    URL could read/edit/delete every row. Re-enabling is idempotent
+--    and harmless even though line 114 already does this — belt and
+--    braces in case the table gets recreated again without it.
+--
+-- 2. `get_user_role()` / `get_user_slot()` read `user_metadata`, which
+--    Supabase lets any logged-in user edit themselves via
+--    `supabase.auth.updateUser({ data: { role: 'super_admin' } })` —
+--    meaning any school/guest/club account could self-escalate to full
+--    admin and every RLS policy in this file would trust it. Fixed by
+--    switching to `app_metadata`, which only the service role (our
+--    server-side API routes) can write. `user_metadata` is kept as a
+--    fallback ONLY until the backfill below runs, so nobody gets
+--    locked out mid-deploy; it's a no-op once every account has
+--    app_metadata.role set.
+--
+-- Run this whole block together, in order, in Supabase SQL Editor.
+-- ============================================================
+
+-- 2a. Enable RLS on announcements (critical — was publicly writable).
+ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
+
+-- 2b. Backfill app_metadata from user_metadata for every existing user,
+--     so nobody loses access the moment the functions below start
+--     preferring app_metadata. Safe to re-run.
+UPDATE auth.users
+SET raw_app_meta_data =
+  COALESCE(raw_app_meta_data, '{}'::jsonb)
+  || jsonb_strip_nulls(jsonb_build_object(
+       'role',        raw_user_meta_data ->> 'role',
+       'slot_number', (raw_user_meta_data ->> 'slot_number')::int
+     ))
+WHERE raw_user_meta_data ? 'role';
+
+-- 2c. Flip the role/slot lookup to trust app_metadata first. The
+--     user_metadata fallback stays as a safety net for any account
+--     that somehow missed the backfill (e.g. created between running
+--     this script and deploying the app_metadata-writing code) — it
+--     does NOT reopen the hole for anyone already backfilled, since
+--     app_metadata is checked first and wins whenever it's present.
+CREATE OR REPLACE FUNCTION public.get_user_role()
+RETURNS TEXT AS $$
+  SELECT COALESCE(
+    (auth.jwt() -> 'app_metadata' ->> 'role'),
+    (auth.jwt() -> 'user_metadata' ->> 'role'),
+    ''
+  );
+$$ LANGUAGE SQL STABLE;
+
+CREATE OR REPLACE FUNCTION public.get_user_slot()
+RETURNS INTEGER AS $$
+  SELECT COALESCE(
+    (auth.jwt() -> 'app_metadata' ->> 'slot_number')::INTEGER,
+    (auth.jwt() -> 'user_metadata' ->> 'slot_number')::INTEGER,
+    0
+  );
+$$ LANGUAGE SQL STABLE;

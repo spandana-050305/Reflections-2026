@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Mail, Lock, ArrowRight, Eye, EyeOff, User, UserPlus } from 'lucide-react'
 import Image from 'next/image'
+import { getRole } from '@/lib/auth-role'
 
 function slugifyLoginId(raw: string): string {
   return raw.toLowerCase().replace(/[^a-z0-9._-]/g, '').trim()
@@ -73,7 +74,7 @@ export default function LoginPage() {
         return
       }
 
-      const role = data.user?.user_metadata?.role
+      const role = getRole(data.user)
       if (role === 'school') {
         // Schools now have their own dedicated sign-in page — sign this
         // session back out rather than let it through the organizer login.

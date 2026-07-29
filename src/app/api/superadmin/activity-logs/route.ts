@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { getCallerUser } from '@/lib/server-auth'
+import { getRole } from '@/lib/auth-role'
 
 function adminClient() {
   return createClient(
@@ -11,21 +11,10 @@ function adminClient() {
   )
 }
 
-async function getCallerRole(): Promise<string | null> {
-  const cookieStore = cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get: (n: string) => cookieStore.get(n)?.value, set() {}, remove() {} } }
-  )
-  const { data: { user } } = await supabase.auth.getUser()
-  return user?.user_metadata?.role ?? null
-}
-
 // GET — latest 200 activity log entries (service role; RLS-independent)
 export async function GET() {
-  const role = await getCallerRole()
-  if (role !== 'super_admin') {
+  const caller = await getCallerUser()
+  if (getRole(caller) !== 'super_admin') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
 

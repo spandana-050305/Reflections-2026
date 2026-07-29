@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { getRole } from '@/lib/auth-role'
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -28,7 +29,7 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  const role = user?.user_metadata?.role as string | undefined
+  const role = getRole(user)
 
   // Public routes — no login required
   const publicRoutes = ['/', '/login', '/school/login', '/about', '/results']

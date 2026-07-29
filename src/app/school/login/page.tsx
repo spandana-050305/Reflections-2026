@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { Mail, Lock, ArrowRight, Eye, EyeOff, School } from 'lucide-react'
 import Image from 'next/image'
 import PhotoGallery from '@/components/PhotoGallery'
+import { getRole } from '@/lib/auth-role'
 
 const stats = [
   { value: '10+', label: 'Years of Legacy' },
@@ -54,7 +55,7 @@ export default function SchoolLoginPage() {
         return
       }
 
-      const role = data.user?.user_metadata?.role
+      const role = getRole(data.user)
       if (role !== 'school') {
         // Wrong portal — this account isn't a school login. Sign it back out
         // so no session is left behind, and point it to the organizer login.

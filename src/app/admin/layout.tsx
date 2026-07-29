@@ -7,12 +7,13 @@ import {
 } from 'lucide-react'
 import NavBar from '@/components/layout/NavBar'
 import NavLink from '@/components/layout/NavLink'
+import { getRole } from '@/lib/auth-role'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-  const role = user.user_metadata?.role as string | undefined
+  const role = getRole(user)
   if (role !== 'final_year' && role !== 'super_admin') redirect('/login')
 
   // Self-registered Final Years need approval before getting full access.

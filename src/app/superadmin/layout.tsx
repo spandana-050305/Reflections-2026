@@ -3,12 +3,13 @@ import { redirect } from 'next/navigation'
 import { ShieldCheck, Users, LayoutDashboard, Activity, ClipboardCheck } from 'lucide-react'
 import NavBar from '@/components/layout/NavBar'
 import NavLink from '@/components/layout/NavLink'
+import { getRole } from '@/lib/auth-role'
 
 export default async function SuperAdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-  if (user.user_metadata?.role !== 'super_admin') redirect('/login')
+  if (getRole(user) !== 'super_admin') redirect('/login')
 
   const navLinks = [
     { href: '/superadmin/dashboard', label: 'Health Dashboard', icon: LayoutDashboard },
