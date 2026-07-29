@@ -46,6 +46,7 @@ export async function DELETE(request: Request) {
     admin.from('marks').delete().eq('event_id', eventId),
     admin.from('guest_marks').delete().eq('event_id', eventId),
     admin.from('results').delete().eq('event_id', eventId),
+    admin.from('onspot_registrations').delete().eq('event_id', eventId),
   ])
   const cascadeError = cascadeResults.find(r => r.error)?.error
   if (cascadeError) return NextResponse.json({ error: `Cascade delete failed: ${cascadeError.message}` }, { status: 500 })

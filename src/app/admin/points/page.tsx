@@ -64,11 +64,14 @@ export default function AdminPointsPage() {
       if (result?.winners_json) {
         try {
           const groups = JSON.parse(result.winners_json)
+          // A school can place in more than one rank group on a multi-entry
+          // event (max_entries > 1) — credit its BEST placement, not
+          // whichever group happens to be processed last.
           groups.forEach((g: any) => {
             if (g.entries.some((e: any) => e.slot === school.slot_number)) {
-              if (g.rank === 1) evPts = pts.p1
-              else if (g.rank === 2) evPts = pts.p2
-              else if (g.rank === 3) evPts = pts.p3
+              if (g.rank === 1) evPts = Math.max(evPts, pts.p1)
+              else if (g.rank === 2) evPts = Math.max(evPts, pts.p2)
+              else if (g.rank === 3) evPts = Math.max(evPts, pts.p3)
             }
           })
         } catch {}

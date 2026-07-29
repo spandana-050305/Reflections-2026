@@ -61,7 +61,7 @@ export default function AdminRequestsPage() {
       const res = await fetch('/api/admin/approve-club-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId: acct.id, userId: acct.user_id }),
+        body: JSON.stringify({ accountId: acct.id, userId: acct.user_id, email: acct.email }),
       })
       const json = await res.json()
       if (!res.ok) { flash(`❌ ${json.error ?? 'Approval failed'}`); setBusy(null); return }

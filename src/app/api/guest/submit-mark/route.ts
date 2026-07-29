@@ -24,6 +24,23 @@ export async function POST(request: Request) {
   }
 
   const admin = adminClient()
+
+  // If this slot/entry was already locked by an admin (see set-entry-lock),
+  // reject the write instead of silently overwriting a frozen mark — a
+  // judge's debounced auto-save can otherwise land after a lock and
+  // change a score the admin believes is final.
+  const { data: existing } = await admin
+    .from('guest_marks')
+    .select('locked')
+    .eq('event_id', eventId)
+    .eq('judge_number', judgeNumber)
+    .eq('slot_number', slotNumber)
+    .eq('entry_index', entryIndex ?? 1)
+    .maybeSingle()
+  if (existing?.locked) {
+    return NextResponse.json({ error: 'This entry is locked and can no longer be edited.' }, { status: 409 })
+  }
+
   const { error } = await admin.from('guest_marks').upsert({
     event_id: eventId,
     judge_number: judgeNumber,
