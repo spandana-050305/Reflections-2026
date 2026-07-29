@@ -1,39 +1,10 @@
-import { NextResponse, type NextRequest } from 'next/server'
-import { signInUser, signUpUser } from '@/lib/local-store.server'
-import { SESSION_COOKIE } from '@/lib/local-auth'
+import { NextResponse } from 'next/server'
 
-const LOCAL_MODE = process.env.NEXT_PUBLIC_LOCAL_MODE === 'true'
-
-export async function POST(req: NextRequest) {
-  if (!LOCAL_MODE) {
-    return NextResponse.json({ user: null, error: { message: 'Local mode disabled' } }, { status: 403 })
-  }
-  try {
-    const body = await req.json()
-
-    if (body.action === 'signin') {
-      const result = signInUser(body.email, body.password)
-      const response = NextResponse.json(result)
-      if (result.user) {
-        // Set cookie server-side so the browser stores it reliably
-        // before window.location.href fires on the client.
-        response.cookies.set(SESSION_COOKIE, encodeURIComponent(JSON.stringify(result.user)), {
-          path: '/',
-          maxAge: 86400,
-          sameSite: 'lax',
-          httpOnly: false,
-        })
-      }
-      return response
-    }
-
-    if (body.action === 'signup') {
-      const result = signUpUser(body.email, body.password, body.data ?? {})
-      return NextResponse.json(result)
-    }
-
-    return NextResponse.json({ user: null, error: { message: 'Unknown action' } }, { status: 400 })
-  } catch (e: any) {
-    return NextResponse.json({ user: null, error: { message: e?.message ?? 'Server error' } }, { status: 500 })
-  }
+// Dead code — the local-mock-mode auth system this route served has been
+// fully replaced by real Supabase Auth. Permanently disabled (not just
+// env-gated) so a stray NEXT_PUBLIC_LOCAL_MODE=true in production could
+// never re-enable it. Left in place only because this file can't be
+// deleted on this mount — safe to delete by hand later.
+export async function POST() {
+  return NextResponse.json({ error: 'Not found' }, { status: 404 })
 }

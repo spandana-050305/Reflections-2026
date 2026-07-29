@@ -114,23 +114,29 @@ ALTER TABLE results       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settings      ENABLE ROW LEVEL SECURITY;
 
--- Helper: get current user's role from metadata
+-- Helper: get current user's role from metadata.
+-- SECURITY: reads app_metadata, NOT user_metadata. user_metadata is
+-- editable by the end user themselves via supabase.auth.updateUser() —
+-- trusting it here would let anyone self-promote to any role. app_metadata
+-- can only be written by the service role (our server-side API routes).
+-- `SET search_path = public` pins the function's schema resolution so it
+-- can't be hijacked by a malicious search_path.
 CREATE OR REPLACE FUNCTION public.get_user_role()
-RETURNS TEXT AS $$
-  SELECT COALESCE(
-    (auth.jwt() -> 'user_metadata' ->> 'role'),
-    ''
-  );
-$$ LANGUAGE SQL STABLE;
+RETURNS TEXT
+LANGUAGE SQL STABLE
+SET search_path = public
+AS $$
+  SELECT COALESCE((auth.jwt() -> 'app_metadata' ->> 'role'), '');
+$$;
 
--- Helper: get current user's slot number
+-- Helper: get current user's slot number (same app_metadata rule as above).
 CREATE OR REPLACE FUNCTION public.get_user_slot()
-RETURNS INTEGER AS $$
-  SELECT COALESCE(
-    (auth.jwt() -> 'user_metadata' ->> 'slot_number')::INTEGER,
-    0
-  );
-$$ LANGUAGE SQL STABLE;
+RETURNS INTEGER
+LANGUAGE SQL STABLE
+SET search_path = public
+AS $$
+  SELECT COALESCE((auth.jwt() -> 'app_metadata' ->> 'slot_number')::INTEGER, 0);
+$$;
 
 -- ── schools policies ─────────────────────────────────────────
 -- Final years see all; schools see only their own row
@@ -328,11 +334,14 @@ ALTER TABLE guest_credentials    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE guest_marks          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE onspot_registrations ENABLE ROW LEVEL SECURITY;
 
--- guest_credentials: admin manages; guests can read to log in
-CREATE POLICY "admin_guest_credentials" ON guest_credentials
-  FOR ALL USING (get_user_role() = 'final_year');
-CREATE POLICY "read_guest_credentials" ON guest_credentials
-  FOR SELECT USING (true);
+-- guest_credentials: stores PLAINTEXT judge passwords for admin display.
+-- SECURITY: intentionally left with NO policies. RLS is enabled with zero
+-- policies, which makes Postgres deny all access by default — the only
+-- way in is the service-role client (src/app/api/admin/create-guest),
+-- which bypasses RLS entirely and is already gated by an approved
+-- final_year/super_admin check. Do NOT add a `FOR SELECT USING (true)`
+-- policy here (an earlier draft of this file had one) — that would make
+-- every judge's plaintext password readable by anyone with an anon key.
 
 -- guest_marks: guests submit their own; admins manage; club/final read
 CREATE POLICY "guest_insert_marks" ON guest_marks
@@ -349,35 +358,31 @@ CREATE POLICY "club_onspot" ON onspot_registrations
   FOR ALL USING (get_user_role() IN ('club_member', 'final_year'));
 
 -- ============================================================
--- SECURITY FIX (run this block on the live database — 26 Jul 2026)
+-- SECURITY FIX — history (completed 29 Jul 2026, kept for the record)
 --
 -- 1. `announcements` had RLS policies defined above but RLS itself was
 --    somehow left disabled on the live table (confirmed via Supabase's
 --    security linter), making it fully public: anyone with the project
---    URL could read/edit/delete every row. Re-enabling is idempotent
---    and harmless even though line 114 already does this — belt and
---    braces in case the table gets recreated again without it.
+--    URL could read/edit/delete every row. Fixed by enabling RLS
+--    (idempotent — line 114 already does this too, belt and braces).
 --
--- 2. `get_user_role()` / `get_user_slot()` read `user_metadata`, which
---    Supabase lets any logged-in user edit themselves via
+-- 2. `get_user_role()` / `get_user_slot()` used to read `user_metadata`,
+--    which Supabase lets any logged-in user edit themselves via
 --    `supabase.auth.updateUser({ data: { role: 'super_admin' } })` —
 --    meaning any school/guest/club account could self-escalate to full
 --    admin and every RLS policy in this file would trust it. Fixed by
---    switching to `app_metadata`, which only the service role (our
---    server-side API routes) can write. `user_metadata` is kept as a
---    fallback ONLY until the backfill below runs, so nobody gets
---    locked out mid-deploy; it's a no-op once every account has
---    app_metadata.role set.
---
--- Run this whole block together, in order, in Supabase SQL Editor.
+--    switching to `app_metadata` (see the function definitions earlier
+--    in this file, above the policies) — only the service role (our
+--    server-side API routes) can write app_metadata. All 17 existing
+--    accounts were backfilled via the UPDATE below and the functions
+--    now read app_metadata ONLY, no fallback — the hole is fully closed.
 -- ============================================================
 
--- 2a. Enable RLS on announcements (critical — was publicly writable).
 ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
 
--- 2b. Backfill app_metadata from user_metadata for every existing user,
---     so nobody loses access the moment the functions below start
---     preferring app_metadata. Safe to re-run.
+-- One-time backfill — already run against the live database. Safe to
+-- re-run (idempotent) if this file is ever applied to a fresh database
+-- that already has users with only user_metadata.role set.
 UPDATE auth.users
 SET raw_app_meta_data =
   COALESCE(raw_app_meta_data, '{}'::jsonb)
@@ -386,27 +391,3 @@ SET raw_app_meta_data =
        'slot_number', (raw_user_meta_data ->> 'slot_number')::int
      ))
 WHERE raw_user_meta_data ? 'role';
-
--- 2c. Flip the role/slot lookup to trust app_metadata first. The
---     user_metadata fallback stays as a safety net for any account
---     that somehow missed the backfill (e.g. created between running
---     this script and deploying the app_metadata-writing code) — it
---     does NOT reopen the hole for anyone already backfilled, since
---     app_metadata is checked first and wins whenever it's present.
-CREATE OR REPLACE FUNCTION public.get_user_role()
-RETURNS TEXT AS $$
-  SELECT COALESCE(
-    (auth.jwt() -> 'app_metadata' ->> 'role'),
-    (auth.jwt() -> 'user_metadata' ->> 'role'),
-    ''
-  );
-$$ LANGUAGE SQL STABLE;
-
-CREATE OR REPLACE FUNCTION public.get_user_slot()
-RETURNS INTEGER AS $$
-  SELECT COALESCE(
-    (auth.jwt() -> 'app_metadata' ->> 'slot_number')::INTEGER,
-    (auth.jwt() -> 'user_metadata' ->> 'slot_number')::INTEGER,
-    0
-  );
-$$ LANGUAGE SQL STABLE;

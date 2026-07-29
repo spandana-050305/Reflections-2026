@@ -26,8 +26,8 @@ export async function POST(req: Request) {
   const slug = slugifyLoginId(loginId ?? '')
   if (!name?.trim()) return NextResponse.json({ error: 'Name is required.' }, { status: 400 })
   if (!slug) return NextResponse.json({ error: 'Invalid login ID.' }, { status: 400 })
-  if (!password || password.length < 4) {
-    return NextResponse.json({ error: 'Password must be at least 4 characters.' }, { status: 400 })
+  if (!password || password.length < 8) {
+    return NextResponse.json({ error: 'Password must be at least 8 characters.' }, { status: 400 })
   }
   if (role !== 'club_member' && role !== 'final_year') {
     return NextResponse.json({ error: 'Invalid role.' }, { status: 400 })

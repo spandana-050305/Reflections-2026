@@ -49,8 +49,8 @@ export async function POST(req: NextRequest) {
 
   if (action === 'reset_password') {
     const { newPassword } = body
-    if (!userId || !newPassword || newPassword.length < 4)
-      return NextResponse.json({ error: 'Missing userId or password (min 4 chars)' }, { status: 400 })
+    if (!userId || !newPassword || newPassword.length < 8)
+      return NextResponse.json({ error: 'Missing userId or password (min 8 chars)' }, { status: 400 })
     const { error } = await admin.auth.admin.updateUserById(userId, { password: newPassword, email_confirm: true })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     await logActivity({ action: 'reset_password', actorEmail: caller?.email, actorRole: 'super_admin', targetEmail, targetId: userId })
